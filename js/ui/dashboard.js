@@ -1,7 +1,7 @@
-import { el, fmtDate, pct, num, esc, daysUntil } from "../utils.js";
-import { recommendedOrder, summarizeTasks } from "../priorities.js";
+import { fmtDate, pct, esc, daysUntil } from "../utils.js";
+import { recommendedOrder } from "../priorities.js";
 import { generateSchedule } from "../schedule.js";
-import { settings, doneIds } from "../storage.js";
+import { doneIds } from "../storage.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data || { courses: [], tasks: [], todos: [] };
@@ -14,8 +14,12 @@ export function render(state, root) {
   const done = new Set(doneIds());
   const open = merged.filter((t) => !t.submitted && !done.has(t.id));
   const focus = recommendedOrder(open, courses).slice(0, 5);
-  const dueToday = open.filter((t) => daysUntil(t.dueAt) === 0);
-  const dueWeek = open.filter((t) => daysUntil(t.dueAt) >= 0 && daysUntil(t.dueAt) <= 7);
+
+  const dd = new Map(open.map((t) => [t.id, daysUntil(t.dueAt)]));
+  const dueToday = open.filter((t) => dd.get(t.id) === 0);
+  const dueWeek = open.filter((t) => { const d = dd.get(t.id); return d >= 0 && d <= 7; });
+  const openByCourse = new Map();
+  for (const t of open) openByCourse.set(t.courseId, (openByCourse.get(t.courseId) || 0) + 1);
   const avgGrade = courses.filter((c) => c.currentScore != null).reduce((a, c) => a + c.currentScore, 0);
 
   const courseCards = courses.map((c) => {
@@ -23,7 +27,7 @@ export function render(state, root) {
     const delta = c.currentScore != null ? Math.round((c.currentScore - c.targetGrade) * 10) / 10 : null;
     const deltaCls = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
     const fill = c.currentScore != null ? Math.max(0, Math.min(100, c.currentScore)) : 0;
-    const nOpen = merged.filter((t) => t.courseId === c.id && !t.submitted && !done.has(t.id)).length;
+    const nOpen = openByCourse.get(c.id) || 0;
     return `
       <div class="card course-card">
         <div class="top">

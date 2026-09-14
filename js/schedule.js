@@ -1,5 +1,5 @@
-import { settings, timeLogs } from "./storage.js";
-import { recommendedOrder, scoreTask } from "./priorities.js";
+import { settings, timeLogs, doneIds } from "./storage.js";
+import { recommendedOrder } from "./priorities.js";
 import { clamp, daysUntil } from "./utils.js";
 
 const HORIZON = 7;
@@ -71,7 +71,7 @@ function fmtClock(min) {
   return `${hh}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-export function breakConfig(c = settings()) {
+function breakConfig(c = settings()) {
   const every = +(c.breakEveryMinutes || 0);
   const len = +(c.breakMinutes || 0);
   return { every, len, on: every > 0 && len > 0 };
@@ -107,7 +107,10 @@ export function generateSchedule(courses, tasks) {
     };
   });
 
-  const open = tasks.filter((t) => !t.submitted && daysUntil(t.dueAt) < 30 && t.dueAt);
+  // Never schedule work the student marked done (locally or submitted on
+  // Canvas), regardless of which caller passes what.
+  const done = new Set(doneIds());
+  const open = tasks.filter((t) => !t.submitted && !done.has(t.id) && daysUntil(t.dueAt) < 30 && t.dueAt);
   const ranked = recommendedOrder(open, courses);
   const byCourse = learnedMap(tasks);
 

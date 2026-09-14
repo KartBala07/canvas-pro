@@ -1,8 +1,7 @@
-import { esc, toast, num } from "../utils.js";
-import { settings, saveSettings, doneIds } from "../storage.js";
+import { esc, toast } from "../utils.js";
+import { settings, doneIds } from "../storage.js";
 
 function snapshot(state) {
-  const s = settings();
   const courses = state.data?.courses || [];
   const tasks = state.data?.tasks || [];
   const done = new Set(doneIds());
@@ -11,25 +10,21 @@ function snapshot(state) {
     .sort((a, b) => +new Date(a.dueAt || 0) - +new Date(b.dueAt || 0))
     .slice(0, 12);
   const overdue = open.filter((t) => t.dueAt && Date.now() > +new Date(t.dueAt)).length;
-  const notes = state.data?.announcements?.length ? `\nLatest announcements:` : "";
   return [
     "You are connected to my Canvas via the Canvas Pro study app. Help me with schoolwork.",
     `Courses (${courses.length}):`,
-    ...courses.map((c) => `- ${c.name}: ${c.score != null ? c.score + "%" : "no grade yet"}${c.target && c.score != null && c.score < c.target ? " (below target " + c.target + ")" : ""}`),
+    ...courses.map((c) => `- ${c.name}: ${c.currentScore != null ? c.currentScore + "%" : "no grade yet"}${c.targetGrade && c.currentScore != null && c.currentScore < c.targetGrade ? " (below target " + c.targetGrade + ")" : ""}`),
     `Open unsubmitted tasks (${open.length}, ${overdue} overdue):`,
-    ...open.map((t) => `- ${t.title} (${t.courseName || ""}) ${t.pointsPossible || "?"}pts due ${t.dueAt || "?"}${t.submission?.pending_review ? " PENDING GRADING" : ""}`),
-    notes,
+    ...open.map((t) => `- ${t.title} (${t.courseName || ""}) ${t.pointsPossible || "?"}pts due ${t.dueAt || "?"}${t.needsGrading ? " PENDING GRADING" : ""}`),
     "Keep answers concise and practical.",
   ].join("\n");
 }
 
-export function render(state, root) {
+export function render(state, root, isStale = () => false) {
   const s = settings();
   const messages = [];
   let ocSession = null;
-  const isOc = () => settings().aiProvider === "opencode";
   let ctxOn = true;
-  let busy = false;
 
   root.innerHTML = `
     <h1>AI Assistant</h1>
@@ -122,6 +117,7 @@ export function render(state, root) {
       }
       const content = data.choices?.[0]?.message?.content;
       if (!content) throw new Error("No reply content in response");
+      if (isStale()) return;
       addMsg("bot", content);
     } catch (err) {
       const nf = (err instanceof TypeError && /failed to fetch/i.test(err.message)) || /networkerror/i.test(err.message || "");
@@ -130,7 +126,7 @@ export function render(state, root) {
           ? "⚠️ Couldn't reach `opencode serve` (is it running? Start it in a terminal: `opencode serve`)."
           : "⚠️ Couldn't reach the local server (\"Failed to fetch\"). This is not an API-key problem — make sure the server has been restarted with the latest code: stop it with Ctrl+C, then run `npm start` again, and reload this page."
         : "⚠️ " + (err.message || String(err));
-      addMsg("bot", msg);
+      if (!isStale()) addMsg("bot", msg);
       if (nf && prov !== "opencode") toast("No response from local server — restart it (Ctrl+C, then npm start).", "err");
     }
   }

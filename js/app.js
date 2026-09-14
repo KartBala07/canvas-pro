@@ -1,6 +1,6 @@
 import { $, $$, toast, esc } from "./utils.js";
 import * as canvas from "./canvas.js";
-import { settings, saveSettings, cacheData, saveData, emailAllowed, cloudReady, applyTheme } from "./storage.js";
+import { settings, saveSettings, cacheData, saveData, emailAllowed, applyTheme } from "./storage.js";
 import * as data from "./data.js";
 
 window.__booted = true;
@@ -40,7 +40,7 @@ const VIEWS = {
   ai: renderAi,
 };
 
-const state = { data: cacheData(), profile: null, isLoggedIn: false };
+const state = { data: cacheData(), profile: null };
 let lastConnectError = "";
 
 function setBadge() {
@@ -72,20 +72,26 @@ function showApp() {
   $("#userBtn").textContent = email ? `${name} · ${email}` : name;
 }
 
+// Stale-render guard: every tab switch bumps the token; async views that still
+// hold the old token know their DOM writes would land on the previous tab.
+let renderToken = 0;
+
 async function renderTab(tab) {
   const root = $("#mainContent");
+  const token = ++renderToken;
   try {
     root.classList.remove("tab-anim");
     void root.offsetWidth;
     root.classList.add("tab-anim");
     setLoading(true, "Rendering…");
     const fn = VIEWS[tab] || renderDashboard;
-    await fn(state, root);
+    await fn(state, root, () => token !== renderToken);
   } catch (e) {
+    if (token !== renderToken) return;
     root.innerHTML = `<div class="card"><h2>Something broke</h2><p class="error">${esc(e.message)}</p><p class="hint error">at: ${esc(e.stack || "").split("\n").slice(0, 3).join(" ⮑ ")}</p></div>`;
     console.error(e);
   } finally {
-    setLoading(false);
+    if (token === renderToken) setLoading(false);
   }
 }
 
@@ -121,7 +127,6 @@ async function connectAndLoad({ silent = false } = {}) {
 
   s.profile = profile;
   state.profile = profile;
-  state.isLoggedIn = true;
   saveSettings();
 
   const ok = await fetchAll();
@@ -266,7 +271,6 @@ async function init() {
 
   if (s.token && s.canvasBaseUrl) {
     state.profile = s.profile;
-    state.isLoggedIn = true;
     canvas.client(s.canvasBaseUrl, s.token);
 
     if (cached && cached.courses) {

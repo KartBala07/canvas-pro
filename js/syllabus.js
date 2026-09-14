@@ -3,7 +3,7 @@
 
 const WEIGHT_KEY = /(homework|classwork|assignment|problem set|worksheet|participation|quiz|test|exam|midterm|final|project|essay|paper|lab|portfolio)/i;
 
-export const TYPE_GROUPS = [
+const TYPE_GROUPS = [
   { keys: /(final|midterm|exam|test)/i, type: "exam" },
   { keys: /quiz(zes)?/i, type: "quiz" },
   { keys: /(project|essay|paper|lab|portfolio)/i, type: "project" },
@@ -11,13 +11,13 @@ export const TYPE_GROUPS = [
   { keys: /(homework|assign|classwork|worksheet|problem set)/i, type: "assignment" },
 ];
 
-export function classify(typeName) {
+function classify(typeName) {
   const n = typeName || "";
   for (const g of TYPE_GROUPS) if (g.keys.test(n)) return g.type;
   return "assignment";
 }
 
-export function extractWeights(text) {
+function extractWeights(text) {
   const weights = {};
   const segs = String(text || "").split(/[;,]|\r?\n|\.\s+(?=[A-Z])/);
   for (const segRaw of segs) {
@@ -42,7 +42,7 @@ export function extractWeights(text) {
   return weights;
 }
 
-export function extractLate(text) {
+function extractLate(text) {
   const policy = { note: [] };
   const seps = /[;.]|\r?\n/;
   const segs = String(text || "").split(seps).filter(Boolean);

@@ -39,10 +39,11 @@ function policyLine(p) {
   return `📋 ${line}`;
 }
 
-export function render(state, root) {
+export function render(state, root, isStale = () => false) {
   const s = settings();
   const courses = state.data?.courses || [];
-  const courseName = (id) => courses.find((c) => c.id === id)?.name || "";
+  const courseNameById = new Map(courses.map((c) => [c.id, c.name]));
+  const courseName = (id) => courseNameById.get(id) || "";
   const all = state.data?.tasks || [];
   const done = new Set(doneIds());
   const late = all.filter((t) =>
@@ -115,7 +116,10 @@ export function render(state, root) {
   let timer = null;
   function showParseLazy(text) {
     clearTimeout(timer);
-    timer = setTimeout(() => showParse(text), 500);
+    timer = setTimeout(() => {
+      if (isStale()) return;
+      showParse(text);
+    }, 500);
   }
 
   function showParse(text) {
@@ -144,7 +148,7 @@ export function render(state, root) {
   }
 
   function refresh() {
-    const rows2 = late.map((t) => ({ t, m: metric(t, settings()) })).sort((a, b) => b.m.score - a.m.score);
+    const rows2 = late.map((t) => ({ t, m: metric(t, s) })).sort((a, b) => b.m.score - a.m.score);
     const potential2 = rows2.reduce((n, r) => n + r.m.impact, 0);
     root.querySelectorAll(".mini-num")[1].innerHTML = `${num(potential2)} <span class="small muted">pts</span>`;
     drawLate(rows2);

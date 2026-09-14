@@ -3,7 +3,7 @@ import { daysUntil, clamp } from "./utils.js";
 const TYPE_BOOST = { exam: 1, quiz: 0.7, project: 0.75, assignment: 0.5 };
 const GRACE_DAYS = 14;
 
-export function scoreTask(task, course) {
+function scoreTask(task, course) {
   const due = daysUntil(task.dueAt);
   const urgency = due == null ? 0 : clamp(1 - (due / GRACE_DAYS), 0, 1);
 

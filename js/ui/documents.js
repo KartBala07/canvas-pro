@@ -131,7 +131,7 @@ async function openFile(f) {
   }
 }
 
-export function fileRow(f, idx) {
+function fileRow(f, idx) {
   const k = kindFor(f);
   const link = !f.locked && f.url;
   const name = link
@@ -147,7 +147,7 @@ export function fileRow(f, idx) {
     </tr>`;
 }
 
-export async function collectFiles(courses, { files: getFiles, modules: getModules } = {}, progress) {
+async function collectFiles(courses, { files: getFiles, modules: getModules } = {}, progress) {
   return Promise.allSettled(courses.map(async (c) => {
     if (progress) progress.textContent = `Scanning ${c.name}…`;
     try {
@@ -164,7 +164,7 @@ export async function collectFiles(courses, { files: getFiles, modules: getModul
   }));
 }
 
-export async function render(state, root) {
+export async function render(state, root, isStale = () => false) {
   root.innerHTML = `
     <h1>Documents</h1>
     <p class="subtitle">Uploads your teachers posted that aren't graded assignments — notes, handouts, slides, and study resources (from course Files, or File items in Modules).</p>
@@ -183,6 +183,8 @@ export async function render(state, root) {
     files: canvas.getCourseFiles,
     modules: canvas.getModuleFiles,
   }, (msg) => { progress.textContent = msg; });
+
+  if (isStale()) return;
 
   const dedupe = (files) => {
     const seen = new Set();

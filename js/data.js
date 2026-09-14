@@ -1,9 +1,7 @@
 import * as canvas from "./canvas.js";
 import { settings } from "./storage.js";
 
-const EXAM_RE = /(final|midterm|exam|test|quiz)/i;
 const PROJECT_RE = /(project|essay|paper|lab report|portfolio)/i;
-const HOMEWORK_RE = /(homework|hw|worksheet|practice|problem set|read)/i;
 
 export function courseTypeFor(course) {
   const id = String(course.id);
@@ -155,8 +153,4 @@ export async function loadAll(onStage) {
   }
 
   return { courses, tasks, todos: dedupeTodos, profile };
-}
-
-export function tasksByName(tasks) {
-  return [...tasks].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
 }

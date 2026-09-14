@@ -58,8 +58,3 @@ export function esc(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
-
-export function debounce(fn, ms) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}

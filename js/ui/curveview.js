@@ -1,11 +1,11 @@
 import { num, esc, toast } from "../utils.js";
-import { solveCurve, renderHistory } from "../curve.js";
+import { solveCurve, renderHistory, letterForScore } from "../curve.js";
 import { settings, cacheGet, cacheSet, cloudUpsert, cloudReady } from "../storage.js";
 
 function localHistory() { return cacheGet("curvehistory", []); }
 function setLocalHistory(h) { cacheSet("curvehistory", h); }
 
-export async function render(state, root) {
+export async function render(state, root, isStale = () => false) {
   const { courses, tasks } = state.data;
   const s = settings();
 
@@ -77,7 +77,7 @@ export async function render(state, root) {
       return;
     }
     const r = solveCurve({ rawScore: raw, possible, averageScore: avg, curvePoints: curve, targetPct: target });
-    const targetLetter = scoreToLetter(target);
+    const targetLetter = letterForScore(target);
     box.innerHTML = `
       <div class="curve-result">
         <div class="ring" style="--score:${Math.max(0, Math.min(100, r.curvedPct))}">
@@ -142,6 +142,7 @@ export async function render(state, root) {
         cloud = await cloudFetch("/rest/v1/curve_data?select=*&order=created_at.desc&limit=200");
       } catch { cloud = []; }
     }
+    if (isStale()) return;
     const merged = mergeHistory(cloud, localHistory());
     box.innerHTML = `<h2>Curve history <span class="muted small">(${merged.length})</span></h2>`;
     renderHistory(merged, box.id);
@@ -156,11 +157,4 @@ export async function render(state, root) {
     for (const e of localArr) map.set(key(e), e);
     return [...map.values()];
   }
-}
-
-function scoreToLetter(s) {
-  if (s >= 93) return "A"; if (s >= 90) return "A-"; if (s >= 87) return "B+";
-  if (s >= 83) return "B"; if (s >= 80) return "B-"; if (s >= 77) return "C+";
-  if (s >= 73) return "C"; if (s >= 70) return "C-"; if (s >= 67) return "D+";
-  if (s >= 63) return "D"; if (s >= 60) return "D-"; return "F";
 }

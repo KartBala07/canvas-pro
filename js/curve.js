@@ -1,4 +1,3 @@
-import { emailDomain } from "./storage.js";
 import { fmtDate, esc } from "./utils.js";
 
 export function letterForScore(score, scale = "standard") {

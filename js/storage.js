@@ -1,6 +1,6 @@
 const PREFIX = "cp:";
 
-export const DEFAULT_JSON = {
+const DEFAULT_JSON = {
   canvasBaseUrl: "",
   token: "",
   profile: null,                       // { id, name, email, schoolDomain }
@@ -48,7 +48,7 @@ export function saveSettings() {
 // ---------- theme: palette (midnight | earthy | earthy-green | cream) x mode (dark | light) ----------
 const PALETTES = ["midnight", "earthy", "earthy-green", "cream"];
 
-export function themeAttr(s = settings()) {
+function themeAttr(s = settings()) {
   const palette = PALETTES.includes(s.theme) ? s.theme : "midnight";
   const light = s.mode === "light";
   if (palette === "cream") return light ? "cream" : "cream-dark";
@@ -72,10 +72,6 @@ export function saveData(data) {
   settings().lastSync = new Date().toISOString();
   saveSettings();
   localStorage.setItem(PREFIX + "data", JSON.stringify(data));
-}
-
-export function clearData() {
-  localStorage.removeItem(PREFIX + "data");
 }
 
 // ---------- small typed caches ----------
@@ -138,7 +134,7 @@ export function logTime(taskId, mins, estimate) {
 // ---------- Supabase ----------
 const EMAIL_RE = /^[^@]+@([^@]+)$/;
 
-export function cloudConfig() { return settings().supabase; }
+function cloudConfig() { return settings().supabase; }
 
 export function cloudReady() { const c = cloudConfig(); return !!(c.url && c.anonKey); }
 
@@ -167,11 +163,6 @@ export async function cloudUpsert(table, rows) {
   });
   if (!r.ok) throw new Error(`Upload failed (${r.status})`);
   return true;
-}
-
-export function deriveUserId(profile) {
-  if (!profile?.email) return null;
-  return btoa(unescape(encodeURIComponent(profile.email)));
 }
 
 export function emailDomain(email) {

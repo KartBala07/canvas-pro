@@ -283,8 +283,3 @@ export function render(state, root) {
     location.reload();
   });
 }
-
-function toastSaved() {
-  const { toast } = window.__cpToast || { toast: () => {} };
-  toast?.("Saved.");
-}

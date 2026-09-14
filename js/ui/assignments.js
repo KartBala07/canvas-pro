@@ -7,6 +7,8 @@ function byDue(a, b) {
   return (a.dueAt || "9999")?.localeCompare(b.dueAt || "9999") || (a.title || "").localeCompare(b.title || "");
 }
 
+const HEAD = `<thead><tr><th></th><th>Assignment</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>`;
+
 export function render(state, root) {
   const { courses, tasks, todos } = state.data;
   let done = new Set(doneIds());
@@ -31,8 +33,6 @@ export function render(state, root) {
   const q = root.querySelector("#asgSearch");
   const hide = root.querySelector("#asgHideDone");
   const list = root.querySelector("#asgList");
-
-  const HEAD = `<thead><tr><th></th><th>Assignment</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>`;
 
   function draw() {
     const term = q.value.toLowerCase();

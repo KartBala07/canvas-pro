@@ -7,6 +7,8 @@ function byDue(a, b) {
   return (a.dueAt || "9999")?.localeCompare(b.dueAt || "9999") || (a.title || "").localeCompare(b.title || "");
 }
 
+const HEAD = `<thead><tr><th></th><th>Test</th><th>Type</th><th>Due</th><th>Study time</th></tr></thead>`;
+
 export function render(state, root) {
   const { courses, tasks, todos } = state.data;
   let done = new Set(doneIds());
@@ -34,8 +36,8 @@ export function render(state, root) {
   function draw() {
     const term = q.value.toLowerCase();
     const passes = (t) => !term || `${t.title} ${t.courseName}`.toLowerCase().includes(term);
-
-    const HEAD = `<thead><tr><th></th><th>Test</th><th>Type</th><th>Due</th><th>Study time</th></tr></thead>`;
+    const ddOf = new Map(tests.map((t) => [t.id, daysUntil(t.dueAt)]));
+    const urgentSoon = (t) => (ddOf.get(t.id) ?? 99) <= 3;
 
     let courseHTML = "";
     for (const c of courses) {
@@ -50,7 +52,7 @@ export function render(state, root) {
       for (const t of completed) if (t.submitted) displayDone.add(t.id);
 
       const prep = activeShown.reduce((a, t) => a + (t.baseMinutes || 0), 0);
-      const urgent = activeShown.filter((t) => (daysUntil(t.dueAt) ?? 99) <= 3).length;
+      const urgent = activeShown.filter(urgentSoon).length;
 
       const doneFold = completedShown.length
         ? `<details class="done-collapse"${term ? " open" : ""}>
@@ -80,7 +82,7 @@ export function render(state, root) {
       <div class="grid grid-3 mt">
         <div class="card"><div class="small muted">Tests open</div><div class="stat"><b>${openTests.length}</b></div></div>
         <div class="card"><div class="small muted">Total study time</div><div class="stat"><b>${Math.round(totalPrep / 60 * 10) / 10}h</b></div></div>
-        <div class="card"><div class="small muted">Due within 3 days</div><div class="stat"><b>${openTests.filter((t) => (daysUntil(t.dueAt) ?? 99) <= 3).length}</b></div></div>
+        <div class="card"><div class="small muted">Due within 3 days</div><div class="stat"><b>${openTests.filter(urgentSoon).length}</b></div></div>
       </div>`;
 
     list.innerHTML = summary + (courseHTML || `<p class="muted">No tests on the calendar.</p>`);

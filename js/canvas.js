@@ -45,7 +45,7 @@ export function client(url, tok) {
   return api;
 }
 
-export async function api(path, { method = "GET", body } = {}) {
+async function api(path, { method = "GET", body } = {}) {
   if (!base || !token) throw new Error("Canvas client not initialized.");
   const { url, headers } = buildRequest(path, { method, body });
   const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
@@ -62,7 +62,7 @@ export async function api(path, { method = "GET", body } = {}) {
 }
 
 // Follows pagination and returns every element.
-export async function all(path, init) {
+async function all(path, init) {
   let out = [];
   let url;
   let headers;
@@ -174,8 +174,4 @@ export async function getModuleFiles(courseId) {
     } catch (e) {}
   }));
   return out;
-}
-
-export function getCalendarEvents(startIso, endIso) {
-  return all(`/api/v1/calendar_events?type=assignment&start_date=${encodeURIComponent(startIso)}&end_date=${encodeURIComponent(endIso)}`);
 }

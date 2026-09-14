@@ -20,7 +20,7 @@ function attachmentLinks(html, base) {
   });
 }
 
-export function annCard(a, courseName) {
+function annCard(a, courseName, base) {
   const read = (a.read_state || "read") === "read";
   const date = a.posted_at ? fmtDate(a.posted_at.split("T")[0]) : "";
   return `
@@ -34,7 +34,7 @@ export function annCard(a, courseName) {
           </div>
           <div class="small muted ann-meta">${esc(courseName)}${a.author?.display_name ? ` · ${esc(a.author.display_name)}` : ""}</div>
         </summary>
-        <div class="ann-body">${attachmentLinks(clean(a.message), settings().canvasBaseUrl || "")}</div>
+        <div class="ann-body">${attachmentLinks(clean(a.message), base)}</div>
         <div class="flex mt">
           <button class="btn btn-ghost btn-small ann-read" ${read ? "disabled" : ""}>Mark read</button>
           ${a.html_url || a.url ? `<a class="btn btn-ghost btn-small" href="${esc(a.html_url || a.url)}" target="_blank" rel="noopener">Open in Canvas ↗</a>` : ""}
@@ -43,7 +43,7 @@ export function annCard(a, courseName) {
     </div>`;
 }
 
-export async function render(state, root) {
+export async function render(state, root, isStale = () => false) {
   root.innerHTML = `
     <div class="flex between" style="align-items:baseline">
       <div>
@@ -66,14 +66,17 @@ export async function render(state, root) {
   let items;
   try {
     items = await canvas.getAnnouncements(courses.map((c) => `course_${c.id}`));
+    if (isStale()) return;
     items = (items || []).filter((a) => a.posted_at);
     items.sort((a, b) => b.posted_at.localeCompare(a.posted_at));
   } catch (e) {
+    if (isStale()) return;
     list.innerHTML = `<div class="card"><p class="error">Couldn't load announcements: ${esc(e.message)}</p><p class="hint muted">Your token may be missing the "Announcements" / Discussion scope. Regenerate it in Canvas settings with Announcements access to use this tab.</p></div>`;
     return;
   }
 
   if (!items.length) {
+    if (isStale()) return;
     list.innerHTML = `<div class="card"><p class="muted">No announcements in the last 60 days.</p></div>`;
     return;
   }
@@ -84,10 +87,11 @@ export async function render(state, root) {
     return c ? c.name : code;
   };
   const unread = items.filter((a) => (a.read_state || "read") !== "read").length;
+  if (isStale()) return;
 
   list.innerHTML = `
     <p class="small muted mb">${items.length} announcement${items.length === 1 ? "" : "s"}${unread ? ` · <b style="color:var(--accent)">${unread} unread</b>` : ""}</p>
-    ${items.map((a) => annCard(a, courseName(a.context_code))).join("")}
+    ${items.map((a) => annCard(a, courseName(a.context_code), settings().canvasBaseUrl || "")).join("")}
   `;
   markAll.classList.toggle("hidden", unread === 0);
 
