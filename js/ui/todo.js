@@ -2,13 +2,13 @@ import { fmtDate, esc } from "../utils.js";
 import { recommendedOrder, bandClass } from "../priorities.js";
 import { settings, saveSettings, doneIds, setDone, clearDone } from "../storage.js";
 
-function activeRowHTML({ task, course, score, band: b, reasons }, done) {
+function activeRowHTML({ task, course, score, band, reasons }, done) {
   return `
     <tr class="${done.has(task.id) ? "done" : ""}" data-id="${esc(task.id)}">
       <td style="width:36px"><input type="checkbox" class="todo-done" data-id="${esc(task.id)}" ${done.has(task.id) ? "checked" : ""} title="Mark done" /></td>
       <td>
         <div>${task.htmlUrl ? `<a href="${esc(task.htmlUrl)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none"><b>${esc(task.title)}</b></a>` : `<b>${esc(task.title)}</b>`}
-          <span class="tag ${bandClass(b)?.split(" ")[0]}">${b}</span> <span class="tag ${task.type === "exam" ? "tag-red" : "tag-blue"}">${task.type}</span></div>
+          <span class="tag ${bandClass(band)?.split(" ")[0]}">${band}</span> <span class="tag ${task.type === "exam" ? "tag-red" : "tag-blue"}">${task.type}</span></div>
         <div class="small muted">${esc(task.courseName || "")} · due ${fmtDate(task.dueAt)}</div>
       </td>
       <td style="width:150px"><div class="priority-bar"><div class="priority-fill ${band === "high" ? "p-high" : band === "mid" ? "p-mid" : "p-low"}" style="width:${score}%"></div></div><div class="small muted">${score}/100</div></td>
