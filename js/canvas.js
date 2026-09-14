@@ -33,6 +33,12 @@ function errorFrom(res, status) {
   return msg;
 }
 
+async function parseJson(res) {
+  const text = await res.text();
+  if (!text) return null; // 204 No Content etc.
+  try { return JSON.parse(text); } catch { return text; }
+}
+
 export function client(url, tok) {
   base = url.replace(/\/$/, "");
   token = tok;
@@ -46,13 +52,13 @@ export async function api(path, { method = "GET", body } = {}) {
   if (!res.ok) {
     let msg = errorFrom(res, res.status);
     try {
-      const j = await res.json();
+      const j = await parseJson(res);
       if (typeof j === "object") msg = j.errors?.[0]?.message || j.message || JSON.stringify(j);
     } catch {}
     if (res.status === 401) throw new Error("401 — Token rejected. Regenerate it in Canvas settings.");
     throw new Error(msg);
   }
-  return res.json();
+  return parseJson(res);
 }
 
 // Follows pagination and returns every element.
@@ -75,8 +81,8 @@ export async function all(path, init) {
       } catch {}
       throw new Error(msg);
     }
-    const data = await res.json();
-    out = out.concat(Array.isArray(data) ? data : [data]);
+    const data = await parseJson(res);
+    out = out.concat(Array.isArray(data) ? data : data ? [data] : []);
     const link = res.headers.get("Link") || "";
     const m = /<([^>]+)>;\s*rel="next"/.exec(link);
     url = m ? m[1] : null;
@@ -110,6 +116,19 @@ export function getCourseFiles(courseId) {
 
 export function fileDownloadUrl(base, courseId, fileId) {
   return `${base.replace(/\/$/, "")}/api/v1/courses/${courseId}/files/${fileId}/download?download_frd=1`;
+}
+
+export function getFile(courseId, fileId) {
+  return api(`/api/v1/courses/${courseId}/files/${fileId}`);
+}
+
+// CanvaDoc preview session — the same mechanism Canvas's own file preview
+// uses. Works for PDF/office/images and rides on the file-read access the
+// listing already has (no extra download scope needed).
+export async function getCanvadocSession(relPath) {
+  const r = await api(relPath);
+  const su = (r && (r.session_url || r.url)) || r;
+  return typeof su === "string" && /^https?:\/\//.test(su) ? su : null;
 }
 
 export function getAnnouncements(contextCodes, cutoffDays = 60) {

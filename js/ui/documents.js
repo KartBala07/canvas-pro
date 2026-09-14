@@ -71,17 +71,38 @@ async function openFile(f) {
             <button class="icon-btn" id="prevClose" title="Close">✕</button>
           </div>
         </div>
-        <div id="prevBody">${bodyHTML || `<div class="muted">This file can't be previewed in the browser.</div>`}</div>
+        <div id="prevBody">${bodyHTML || `<div class="muted">This file can't be previewed.</div>`}</div>
         ${foot ? `<div class="modal-foot">${foot}</div>` : ""}
       </div>`;
     document.body.appendChild(ov);
     ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("#prevClose")) closePreview(); });
   };
 
-  const url = canvas.fileDownloadUrl(base, cid, fid);
+  // 1) Preferred: CanvaDoc preview session (Canvas's own viewer, handles
+  //    PDF + office docs + images, no download scope needed). Module-sourced
+  //    files don't carry a session — pull the full file object to get one.
+  let canvasDocUrl = f.canvadoc_session_url;
+  if (!canvasDocUrl && cid && fid) {
+    try {
+      const meta = await canvas.getFile(cid, fid);
+      if (meta && meta.canvadoc_session_url) canvasDocUrl = meta.canvadoc_session_url;
+    } catch (e) {}
+  }
+  if (canvasDocUrl) {
+    try {
+      const sessionUrl = await canvas.getCanvadocSession(canvasDocUrl);
+      if (sessionUrl) {
+        show(`<iframe src="${esc(sessionUrl)}" allowfullscreen style="width:100%;height:68vh;border:none;border-radius:12px;background:#fff"></iframe>
+          <p class="small muted" style="margin-top:8px">Preview powered by CanvaDoc. If it looks blank, use the ↗ button to open it in Canvas.</p>`);
+        return;
+      }
+    } catch (e) {}
+  }
+
+  // 2) Fallback: fetch bytes directly and render images/audio/video/PDF/text.
   let blob;
   try {
-    const res = await fetch("/api/dl?u=" + encodeURIComponent(url), {
+    const res = await fetch("/api/dl?u=" + encodeURIComponent(canvas.fileDownloadUrl(base, cid, fid)), {
       headers: { "X-Canvas-Token": s.token, "X-Canvas-Base": base },
     });
     if (!res.ok) {
@@ -91,7 +112,7 @@ async function openFile(f) {
     }
     blob = await res.blob();
   } catch (e) {
-    show(`<p class="error">${esc(e.message)}</p><p class="small muted">Your token may be missing the Files download scope, or the file is locked for this account.</p>`,
+    show(`<p class="error">${esc(e.message)}</p><p class="small muted">If this file has a #{preview} page in Canvas you can open it with the ↗ button above.</p>`,
       `<a class="btn" href="${esc(onCanvas)}" target="_blank" rel="noopener">Open in Canvas ↗</a>`);
     return;
   }
@@ -105,7 +126,7 @@ async function openFile(f) {
     if (kind === "text") text = await blob.text();
     show(previewBody(kind, obj, text));
   } else {
-    show(`<p class="muted">"${esc(f.display_name || f.filename)}" is a ${esc(ct || f.mime_class || "file")} — this type isn't viewable in an in-app preview.</p>`,
+    show(`<p class="muted">"${esc(f.display_name || f.filename)}" is a ${esc(ct || f.mime_class || "file")} — this type isn't viewable in the in-app viewer.</p>`,
       `<a class="btn" href="${esc(onCanvas)}" target="_blank" rel="noopener">Open in Canvas ↗</a>`);
   }
 }

@@ -658,6 +658,12 @@ tbody tr:last-child td { border-bottom: none; }
 .ann-body img { max-width: 100%; border-radius: 10px; }
 .ann-body a { color: var(--accent); }
 .ann-body p { margin: 8px 0; }
+.ann-att {
+  display: inline-block; margin: 6px 0;
+  background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px;
+  padding: 7px 13px; color: var(--accent); text-decoration: none; font-size: 13px;
+}
+.ann-att:hover { border-color: var(--accent); }
 
 .done-collapse { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
 .done-collapse summary {

@@ -1,4 +1,5 @@
 import { esc, toast, fmtDate } from "../utils.js";
+import { settings } from "../storage.js";
 import * as canvas from "../canvas.js";
 
 function clean(html) {
@@ -7,6 +8,16 @@ function clean(html) {
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
     .replace(/\son\w+="[^"]*"/gi, "");
+}
+
+// Embedded file <img>s point at Canvas file URLs that need auth the page
+// doesn't have (they show bare JSON here). Swap them for attachment links.
+function attachmentLinks(html, base) {
+  return String(html || "").replace(/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/gi, (m, src) => {
+    if (!/\/files\/|preview|download/i.test(src)) return m;
+    const href = /^https?:\/\//.test(src) ? src : `${base}${src}`;
+    return `<a href="${esc(href)}" target="_blank" rel="noopener" class="ann-att">📎 file attachment</a>`;
+  });
 }
 
 export function annCard(a, courseName) {
@@ -23,7 +34,7 @@ export function annCard(a, courseName) {
           </div>
           <div class="small muted ann-meta">${esc(courseName)}${a.author?.display_name ? ` · ${esc(a.author.display_name)}` : ""}</div>
         </summary>
-        <div class="ann-body">${clean(a.message)}</div>
+        <div class="ann-body">${attachmentLinks(clean(a.message), settings().canvasBaseUrl || "")}</div>
         <div class="flex mt">
           <button class="btn btn-ghost btn-small ann-read" ${read ? "disabled" : ""}>Mark read</button>
           ${a.html_url || a.url ? `<a class="btn btn-ghost btn-small" href="${esc(a.html_url || a.url)}" target="_blank" rel="noopener">Open in Canvas ↗</a>` : ""}
