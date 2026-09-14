@@ -189,6 +189,10 @@ async function init() {
   const s = settings();
   const cached = cacheData();
 
+  // Always wire the connect button: a stale token can land on this screen and
+  // the button must work there too.
+  bindOnboarding();
+
   if (s.token && s.canvasBaseUrl) {
     state.profile = s.profile;
     state.isLoggedIn = true;
@@ -198,13 +202,11 @@ async function init() {
       showApp();
       renderTab("dashboard");
       setSync("Loaded offline · refresh to sync", "");
+    } else if (!(await connectAndLoad())) {
+      // Couldn't reconnect; keep the connect screen visible with the error.
     } else {
-      await connectAndLoad();
-      if (state.isLoggedIn) showApp();
+      showApp();
     }
-  } else {
-    bindOnboarding();
-    $("#onboarding").classList.remove("hidden");
   }
 }
 
