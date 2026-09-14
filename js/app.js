@@ -5,6 +5,13 @@ import * as data from "./data.js";
 
 window.__booted = true;
 
+window.addEventListener("error", (e) => {
+  toast("Error: " + e.message, "err");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  toast("Error: " + (e.reason?.message || e.reason || "unknown"), "err");
+});
+
 import { render as renderDashboard } from "./ui/dashboard.js";
 import { render as renderAssignments } from "./ui/assignments.js";
 import { render as renderTodo } from "./ui/todo.js";
@@ -130,23 +137,35 @@ async function fetchAll() {
 }
 
 function bindEvents() {
-  $$(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      $$(".tab-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.tab = btn.dataset.tab;
-      renderTab(state.tab);
-    });
+  // Event delegation: works even if a node is replaced or a direct binding
+  // was set up under an error, and catches clicks on children.
+  document.addEventListener("click", (e) => {
+    const tab = e.target.closest && e.target.closest(".tab-btn");
+    if (tab) {
+      switchTab(tab);
+      return;
+    }
+    if (e.target.closest && e.target.closest("#refreshBtn")) {
+      fetchAll().catch(() => setSync("Sync failed", "err"));
+      return;
+    }
+    if (e.target.closest && e.target.closest("#userBtn")) {
+      switchTab(document.querySelector('.tab-btn[data-tab="settings"]'));
+    }
   });
+}
 
-  $("#refreshBtn").addEventListener("click", () => fetchAll());
-
-  $("#userBtn").addEventListener("click", () => {
-    state.tab = "settings";
+function switchTab(btn) {
+  if (!btn) return;
+  try {
     $$(".tab-btn").forEach((b) => b.classList.remove("active"));
-    $('.tab-btn[data-tab="settings"]').classList.add("active");
-    renderTab("settings");
-  });
+    btn.classList.add("active");
+    state.tab = btn.dataset.tab;
+    renderTab(state.tab);
+  } catch (err) {
+    toast("Tab failed: " + err.message, "err");
+    console.error(err);
+  }
 }
 
 function bindOnboarding() {
