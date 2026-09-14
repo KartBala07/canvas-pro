@@ -1,6 +1,6 @@
 import { $, $$, toast, esc } from "./utils.js";
 import * as canvas from "./canvas.js";
-import { settings, saveSettings, cacheData, saveData, emailAllowed, cloudReady } from "./storage.js";
+import { settings, saveSettings, cacheData, saveData, emailAllowed, cloudReady, applyTheme } from "./storage.js";
 import * as data from "./data.js";
 
 window.__booted = true;
@@ -154,6 +154,13 @@ function bindEvents() {
       fetchAll().catch(() => setSync("Sync failed", "err"));
       return;
     }
+    if (e.target.closest && e.target.closest("#modeToggle")) {
+      const s = settings();
+      s.mode = s.mode === "light" ? "dark" : "light";
+      saveSettings();
+      applyTheme();
+      return;
+    }
     if (e.target.closest && e.target.closest("#userBtn")) {
       switchTab(document.querySelector('.tab-btn[data-tab="settings"]'));
     }
@@ -239,6 +246,7 @@ async function serverStatusOnBoot() {
 async function init() {
   setBadge();
   bindEvents();
+  applyTheme();
   serverStatusOnBoot();
   bindOnboarding();
   const s = settings();

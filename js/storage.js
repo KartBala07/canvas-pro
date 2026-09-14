@@ -19,6 +19,7 @@ export const DEFAULT_JSON = {
   filterSubmitted: true,
   todoHideDone: false,
   theme: "midnight",
+  mode: "dark",
   lastSync: null,
 };
 
@@ -37,6 +38,23 @@ export function settings() {
 
 export function saveSettings() {
   localStorage.setItem(PREFIX + "settings", JSON.stringify(settings()));
+}
+
+// ---------- theme: palette (midnight | earthy | earthy-green | cream) x mode (dark | light) ----------
+const PALETTES = ["midnight", "earthy", "earthy-green", "cream"];
+
+export function themeAttr(s = settings()) {
+  const palette = PALETTES.includes(s.theme) ? s.theme : "midnight";
+  const light = s.mode === "light";
+  if (palette === "cream") return light ? "cream" : "cream-dark";
+  return light ? palette + "-light" : palette;
+}
+
+export function applyTheme() {
+  const el = document.documentElement;
+  if (el && typeof el.setAttribute === "function") el.setAttribute("data-theme", themeAttr());
+  const btn = document.getElementById && document.getElementById("modeToggle");
+  if (btn) btn.textContent = settings().mode === "light" ? "🌙" : "☀️";
 }
 
 // ---------- cached dataset (courses/assignments/todos/grades from Canvas) ----------

@@ -25,6 +25,31 @@
   --mono: "SFMono-Regular", "Menlo", monospace;
 }
 
+/* Midnight, light (cool blue-white cloud) */
+html[data-theme="midnight-light"] {
+  --bg: #eef1fa;
+  --bg-soft: #e2e7f3;
+  --card: #ffffff;
+  --card-2: #eef1fb;
+  --border: #d5dced;
+  --text: #222a45;
+  --muted: #5e6a91;
+  --accent: #4f6bff;
+  --accent-2: #7c5ce8;
+  --green: #2fae73;
+  --yellow: #b5981d;
+  --orange: #cf7a2c;
+  --red: #cc4d66;
+  --purple: #8a5fd0;
+  --glow-a: rgba(79, 107, 255, .10);
+  --glow-b: rgba(124, 92, 232, .08);
+  --bar-bg: rgba(255, 255, 255, .85);
+  --side-bg: rgba(255, 255, 255, .6);
+  --overlay: rgba(30, 40, 80, .35);
+  --shadow: 0 8px 24px rgba(35, 50, 95, .14);
+  --check-mark: #fff;
+}
+
 /* Warm, earthy, low-contrast dark palette */
 html[data-theme="earthy"] {
   --bg: #191512;
@@ -50,7 +75,82 @@ html[data-theme="earthy"] {
   --check-mark: #fff;
 }
 
-/* Creamy light palette */
+/* Earthy, light (warm sand) */
+html[data-theme="earthy-light"] {
+  --bg: #f2e9da;
+  --bg-soft: #e8dcc4;
+  --card: #fbf6ec;
+  --card-2: #f3e9d6;
+  --border: #dcccaa;
+  --text: #44382a;
+  --muted: #93805f;
+  --accent: #a9822f;
+  --accent-2: #7f9c57;
+  --green: #5d8a4e;
+  --yellow: #b5902f;
+  --orange: #c07a33;
+  --red: #bb5746;
+  --purple: #8f6fb5;
+  --glow-a: rgba(169, 130, 47, .13);
+  --glow-b: rgba(127, 156, 87, .12);
+  --bar-bg: rgba(251, 246, 236, .85);
+  --side-bg: rgba(251, 246, 236, .6);
+  --overlay: rgba(70, 58, 40, .35);
+  --shadow: 0 8px 24px rgba(110, 90, 55, .16);
+  --check-mark: #fff;
+}
+
+/* Forest greens, dark */
+html[data-theme="earthy-green"] {
+  --bg: #101712;
+  --bg-soft: #19231b;
+  --card: #1c2a21;
+  --card-2: #243527;
+  --border: #2f4733;
+  --text: #eaf2e6;
+  --muted: #9db5a0;
+  --accent: #6cc287;
+  --accent-2: #93b55a;
+  --green: #7fdb9d;
+  --yellow: #d9c866;
+  --orange: #d9a25f;
+  --red: #dd6f60;
+  --purple: #a58fd9;
+  --glow-a: rgba(108, 194, 135, .16);
+  --glow-b: rgba(147, 181, 90, .10);
+  --bar-bg: rgba(16, 23, 18, .82);
+  --side-bg: rgba(16, 23, 18, .55);
+  --overlay: rgba(12, 18, 14, .82);
+  --shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  --check-mark: #fff;
+}
+
+/* Forest greens, light */
+html[data-theme="earthy-green-light"] {
+  --bg: #eff4e8;
+  --bg-soft: #e2ead4;
+  --card: #fbfdf5;
+  --card-2: #f1f6e5;
+  --border: #d3dfc0;
+  --text: #2f402e;
+  --muted: #71866b;
+  --accent: #4f9a63;
+  --accent-2: #7aa53b;
+  --green: #4f9a63;
+  --yellow: #b1921e;
+  --orange: #c08135;
+  --red: #bd5c4c;
+  --purple: #8f6fb5;
+  --glow-a: rgba(79, 154, 99, .13);
+  --glow-b: rgba(122, 165, 59, .12);
+  --bar-bg: rgba(251, 253, 245, .85);
+  --side-bg: rgba(251, 253, 245, .6);
+  --overlay: rgba(45, 60, 40, .35);
+  --shadow: 0 8px 24px rgba(80, 105, 60, .15);
+  --check-mark: #fff;
+}
+
+/* Cream, light (default light) */
 html[data-theme="cream"] {
   --bg: #f6ecd9;
   --bg-soft: #efdfc4;
@@ -72,6 +172,31 @@ html[data-theme="cream"] {
   --side-bg: rgba(255, 252, 244, .6);
   --overlay: rgba(70, 60, 45, .35);
   --shadow: 0 8px 24px rgba(90, 75, 50, .16);
+  --check-mark: #fff;
+}
+
+/* Cream, dark (the same warm ivory tones, night mode) */
+html[data-theme="cream-dark"] {
+  --bg: #16120d;
+  --bg-soft: #201b13;
+  --card: #262019;
+  --card-2: #30291f;
+  --border: #463c2c;
+  --text: #f0e6d3;
+  --muted: #b3a383;
+  --accent: #cfab5b;
+  --accent-2: #a0b877;
+  --green: #a3bf7f;
+  --yellow: #dcc26a;
+  --orange: #d68f48;
+  --red: #d16a5d;
+  --purple: #b38ad5;
+  --glow-a: rgba(207, 171, 91, .14);
+  --glow-b: rgba(160, 184, 119, .10);
+  --bar-bg: rgba(22, 18, 13, .82);
+  --side-bg: rgba(22, 18, 13, .55);
+  --overlay: rgba(18, 14, 10, .82);
+  --shadow: 0 8px 24px rgba(0, 0, 0, .45);
   --check-mark: #fff;
 }
 
@@ -126,7 +251,17 @@ body {
 .badge-beta  { background: color-mix(in srgb, var(--yellow) 16%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 45%, transparent); }
 .badge-main  { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 45%, transparent); }
 
-.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 999px;
+  background: var(--card-2); border: 1px solid var(--border);
+  display: grid; place-content: center; cursor: pointer;
+  font-size: 16px; color: var(--text);
+  transition: border-color .15s ease, transform .1s ease, background .15s ease;
+}
+.icon-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+.icon-btn:active { transform: scale(.92); }
 
 .sync-state { font-size: 12px; color: var(--muted); }
 .sync-state.ok { color: var(--green); }
@@ -402,7 +537,7 @@ tr.done td:first-child { text-decoration: none; }
 .toggle input:checked + .track::after { transform: translateX(20px); background: var(--check-mark, #fff); }
 
 /* ---------- Theme picker ---------- */
-.theme-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.theme-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .theme-swatch {
   border: 2px solid var(--border); border-radius: 16px; padding: 12px; cursor: pointer;
   background: var(--card-2); color: var(--text); text-align: left; font: inherit;
@@ -413,9 +548,17 @@ tr.done td:first-child { text-decoration: none; }
 .theme-swatch .sw { height: 46px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border); }
 .sw-midnight { background: linear-gradient(135deg, #0f1220, #222842 60%, #6c8cff); }
 .sw-earthy   { background: linear-gradient(135deg, #191512, #372e22 60%, #d3a855); }
-.sw-cream    { background: linear-gradient(135deg, #f6ecd9, #fffcf4 60%, #6d8f4e); }
+.sw-earthy-green { background: linear-gradient(135deg, #101712, #243527 60%, #6cc287); }
+.sw-cream    { background: linear-gradient(135deg, #16120d, #30291f 45%, #f6ecd9); }
 .theme-swatch .name { font-size: 13px; font-weight: 700; }
 .theme-swatch .desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.mode-seg .btn { border-radius: 999px; font-weight: 600; }
+.mode-seg .btn.active {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: var(--check-mark, #fff);
+  border: none;
+}
 
 @media (max-width: 900px) {
   .layout { flex-direction: column; }

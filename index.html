@@ -10,19 +10,21 @@
       var t = "midnight";
       try {
         var s = JSON.parse(localStorage.getItem("cp:settings") || "{}");
-        if (["midnight", "earthy", "cream"].indexOf(s.theme) >= 0) t = s.theme;
+        var pal = ["midnight", "earthy", "earthy-green", "cream"].indexOf(s.theme) >= 0 ? s.theme : "midnight";
+        var light = s.mode === "light";
+        t = pal === "cream" ? (light ? "cream" : "cream-dark") : (light ? pal + "-light" : pal);
       } catch (e) {}
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=210" />
+  <link rel="stylesheet" href="css/styles.css?v=220" />
   <script>
     // Fail-safe: the module app hides both screens until it boots. If it
     // doesn't boot, surface the connect screen + an explanation instead of
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    window.__rev = "b25";
+    window.__rev = "b26";
     function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
@@ -57,6 +59,7 @@
         <span id="versionBadge" class="badge badge-beta">BETA</span>
       </div>
       <div class="topbar-right">
+        <button id="modeToggle" class="icon-btn" title="Toggle dark / light"></button>
         <button id="refreshBtn" class="btn btn-ghost" title="Refresh data">Refresh</button>
         <span id="syncState" class="sync-state"></span>
         <button id="userBtn" class="user-chip" title="Account / settings"></button>

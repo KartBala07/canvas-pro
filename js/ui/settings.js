@@ -1,5 +1,5 @@
 import { esc, toast } from "../utils.js";
-import { settings, saveSettings, cloudReady } from "../storage.js";
+import { settings, saveSettings, cloudReady, applyTheme } from "../storage.js";
 import { courseTypeFor } from "../data.js";
 
 export function render(state, root) {
@@ -24,11 +24,12 @@ export function render(state, root) {
 
     <div class="card">
       <h2>Appearance</h2>
-      <p class="small muted">Three moods — applies instantly, saved on this device. Animations, round corners and checkmarks theme along with it.</p>
+      <p class="small muted">Pick a palette, then a mode — every theme has a dark and a light version. Applies instantly, saved on this device.</p>
       <div class="theme-row mt">
         ${[
           { id: "midnight", name: "Midnight", desc: "Cool blue night", sw: "sw-midnight" },
           { id: "earthy", name: "Earthy", desc: "Warm, natural tones", sw: "sw-earthy" },
+          { id: "earthy-green", name: "Earthy Green", desc: "Forest greens, sage", sw: "sw-earthy-green" },
           { id: "cream", name: "Cream", desc: "Soft light cream", sw: "sw-cream" },
         ].map((t) => `
           <button class="theme-swatch ${s.theme === t.id ? "active" : ""}" data-theme="${t.id}">
@@ -36,6 +37,11 @@ export function render(state, root) {
             <div class="name">${t.name}</div>
             <div class="desc">${t.desc}</div>
           </button>`).join("")}
+      </div>
+      <div class="mode-seg mt flex">
+        <button id="modeDark" class="btn btn-small ${s.mode !== "light" ? "active" : ""}">Dark</button>
+        <button id="modeLight" class="btn btn-small ${s.mode === "light" ? "active" : ""}">Light</button>
+        <span class="small muted">You can also toggle mode from the 🌙 / ☀️ button in the top bar.</span>
       </div>
     </div>
 
@@ -96,17 +102,26 @@ export function render(state, root) {
   `;
 
   const save = () => saveSettings();
+  const apply = () => { applyTheme(); save(); };
 
   root.querySelectorAll(".theme-swatch").forEach((b) => {
     b.addEventListener("click", () => {
       const t = b.dataset.theme;
       root.querySelectorAll(".theme-swatch").forEach((x) => x.classList.toggle("active", x === b));
       s.theme = t;
-      save();
-      document.documentElement.setAttribute("data-theme", t);
-      toast(`Theme saved: ${t}.`);
+      apply();
+      toast(`Palette saved: ${t}.`);
     });
   });
+
+  const setMode = (mode, btn) => {
+    s.mode = mode;
+    root.querySelector("#modeDark")?.classList.toggle("active", mode !== "light");
+    root.querySelector("#modeLight")?.classList.toggle("active", mode === "light");
+    apply();
+  };
+  root.querySelector("#modeDark")?.addEventListener("click", () => setMode("dark"));
+  root.querySelector("#modeLight")?.addEventListener("click", () => setMode("light"));
 
   root.querySelector("#reconnect")?.addEventListener("click", () => {
     localStorage.removeItem("cp:settings");
