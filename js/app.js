@@ -24,6 +24,7 @@ const VIEWS = {
 };
 
 const state = { data: cacheData(), profile: null, isLoggedIn: false };
+let lastConnectError = "";
 
 function setBadge() {
   fetch("version.json").then((r) => r.json()).then((v) => {
@@ -71,7 +72,8 @@ async function renderTab(tab) {
 async function connectAndLoad({ silent = false } = {}) {
   const s = settings();
   if (!s.canvasBaseUrl || !s.token) {
-    if (!silent) { toast("Canvas URL and token are required.", "err"); return false; }
+    lastConnectError = "Canvas URL and token are required.";
+    if (!silent) { toast(lastConnectError, "err"); }
     return false;
   }
 
@@ -82,24 +84,28 @@ async function connectAndLoad({ silent = false } = {}) {
     profile = await canvas.getProfile();
   } catch (e) {
     setLoading(false);
+    lastConnectError = e.message;
     if (!silent) toast(e.message, "err");
     return false;
   }
 
+  profile = { ...profile, email: profile.primary_email || profile.email || null };
+
   const check = emailAllowed(profile);
   if (!check.ok) {
     setLoading(false);
+    lastConnectError = check.reason;
     if (!silent) toast(check.reason, "err");
     return false;
   }
 
-  profile = { ...profile, email: profile.primary_email || profile.email || null };
   s.profile = profile;
-  saveSettings();
   state.profile = profile;
   state.isLoggedIn = true;
+  saveSettings();
 
   const ok = await fetchAll();
+  if (!ok) lastConnectError = "Connected, but could not load your classes/grades from Canvas.";
   return ok;
 }
 
@@ -144,22 +150,36 @@ function bindEvents() {
 }
 
 function bindOnboarding() {
-  $("#onConnect").addEventListener("click", async () => {
+  const btn = $("#onConnect");
+  const err = $("#onboardingError");
+  btn.addEventListener("click", async () => {
     const url = $("#onCanvasUrl").value.trim();
     const token = $("#onToken").value.trim();
     if (!url || !token) {
-      $("#onboardingError").textContent = "Both the Canvas URL and token are required.";
-      $("#onboardingError").classList.remove("hidden");
+      err.textContent = "Both the Canvas URL and token are required.";
+      err.classList.remove("hidden");
       return;
     }
+    err.classList.add("hidden");
+    btn.disabled = true;
+    btn.textContent = "Connecting…";
     const s = settings();
     s.canvasBaseUrl = url;
     s.token = token;
     saveSettings();
-    setLoading(true, "Verifying token…");
-    const ok = await connectAndLoad();
-    if (ok) showApp();
-    else setLoading(false);
+    try {
+      const ok = await connectAndLoad();
+      if (!ok) {
+        err.textContent = lastConnectError || "Connection failed.";
+        err.classList.remove("hidden");
+      }
+    } catch (e) {
+      err.textContent = e.message || "Connection failed.";
+      err.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Connect to Canvas";
+    }
   });
 }
 
