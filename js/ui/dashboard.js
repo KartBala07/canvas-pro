@@ -1,7 +1,7 @@
 import { el, fmtDate, pct, num, esc, daysUntil } from "../utils.js";
 import { recommendedOrder, summarizeTasks } from "../priorities.js";
 import { generateSchedule } from "../schedule.js";
-import { settings } from "../storage.js";
+import { settings, doneIds } from "../storage.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data || { courses: [], tasks: [], todos: [] };
@@ -11,7 +11,8 @@ export function render(state, root) {
   }
 
   const merged = [...tasks, ...todos.filter((t) => !state.data.tasks.some((x) => x.id === t.id))];
-  const open = merged.filter((t) => !t.submitted);
+  const done = new Set(doneIds());
+  const open = merged.filter((t) => !t.submitted && !done.has(t.id));
   const focus = recommendedOrder(open, courses).slice(0, 5);
   const dueToday = open.filter((t) => daysUntil(t.dueAt) === 0);
   const dueWeek = open.filter((t) => daysUntil(t.dueAt) >= 0 && daysUntil(t.dueAt) <= 7);
@@ -22,7 +23,7 @@ export function render(state, root) {
     const delta = c.currentScore != null ? Math.round((c.currentScore - c.targetGrade) * 10) / 10 : null;
     const deltaCls = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
     const fill = c.currentScore != null ? Math.max(0, Math.min(100, c.currentScore)) : 0;
-    const nOpen = merged.filter((t) => t.courseId === c.id && !t.submitted).length;
+    const nOpen = merged.filter((t) => t.courseId === c.id && !t.submitted && !done.has(t.id)).length;
     return `
       <div class="card course-card">
         <div class="top">

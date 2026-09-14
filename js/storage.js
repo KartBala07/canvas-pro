@@ -15,6 +15,7 @@ export const DEFAULT_JSON = {
   supabase: { url: "", anonKey: "" },
   courseTypes: {},                     // courseId => "ap" | "honors" | "regular"
   filterSubmitted: true,
+  todoHideDone: false,
   lastSync: null,
 };
 
