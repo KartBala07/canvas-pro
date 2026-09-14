@@ -349,3 +349,8 @@ tr.done td:first-child { text-decoration: none; }
   user-select: none; padding: 4px 0;
 }
 .done-collapse summary:hover { color: var(--text); }
+
+.slot.break { border-left: 2px dashed var(--border); opacity: .85; }
+.slot.break .what div:first-child { color: var(--muted); font-style: italic; }
+.slot.break .mins { color: var(--muted); }
+.col { display: flex; flex-direction: column; gap: 4px; }

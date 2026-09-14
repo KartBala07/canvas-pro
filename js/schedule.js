@@ -34,12 +34,24 @@ function fmtClock(min) {
   return `${hh}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+export function breakConfig(c = settings()) {
+  const every = +(c.breakEveryMinutes || 0);
+  const len = +(c.breakMinutes || 0);
+  return { every, len, on: every > 0 && len > 0 };
+}
+
 export function generateSchedule(courses, tasks) {
   const conf = settings();
   const slots = conf.studySlots.length ? conf.studySlots : [{ start: "18:00", end: "21:00", label: "Evening" }];
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const { every, len, on } = breakConfig(conf);
+
+  // Reserve room inside each day's window for breaks: in a 3h block with a
+  // 50+10 rhythm, only ~150 min are actually study time.
+  const studyCap = (a) => (on ? Math.max(10, a - Math.floor(a / (every + len)) * len) : a);
 
   const days = Array.from({ length: HORIZON }, (_, i) => {
     const date = new Date(today);
@@ -53,7 +65,7 @@ export function generateSchedule(courses, tasks) {
       date,
       label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }),
       available: avail,
-      remaining: avail,
+      remaining: studyCap(avail),
       slots: [],
     };
   });
@@ -142,17 +154,36 @@ export function generateSchedule(courses, tasks) {
     let cursor = 0;
     let inWindow = false;
     let currentStart = 0;
+    let sinceBreak = 0;
     const placed = [];
     for (const slot of d.slots) {
       while (cursor < windows.length && slot.mins > 0) {
         const w = windows[cursor];
-        const free = w.endM - (inWindow ? currentStart + 0 : w.startM);
-        if (free <= 0) { cursor++; inWindow = false; currentStart = 0; continue; }
         if (!inWindow) { inWindow = true; currentStart = w.startM; }
+        const free = w.endM - currentStart;
+        if (free <= 0) { cursor++; inWindow = false; currentStart = 0; continue; }
+
+        // Time for a break? Insert one before continuing to study.
+        if (on && sinceBreak >= every && free >= len) {
+          placed.push({
+            kind: "break",
+            what: "Break",
+            labels: "Step away, stretch, water",
+            mins: len,
+            priority: -1,
+            start: fmtClock(currentStart),
+            end: fmtClock(currentStart + len),
+          });
+          currentStart += len;
+          sinceBreak = 0;
+          continue;
+        }
+
         const take = Math.min(slot.mins, free);
         placed.push({ ...slot, mins: take, start: fmtClock(currentStart), end: fmtClock(currentStart + take) });
         currentStart += take;
         slot.mins -= take;
+        sinceBreak += take;
         if (currentStart >= w.endM) { cursor++; inWindow = false; currentStart = 0; }
       }
     }

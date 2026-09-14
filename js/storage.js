@@ -10,6 +10,8 @@ export const DEFAULT_JSON = {
   studySlots: [{ start: "18:00", end: "21:00", label: "Evening" }],
   maxStudyMinutesPerDay: 240,
   baseMinutesPerPoint: 1.2,
+  breakEveryMinutes: 50,
+  breakMinutes: 10,
   difficulty: { assignment: 1, quiz: 1.6, exam: 2.6, test: 2.6, project: 2.2 },
   difficultyOverrides: {},             // courseId => { factor, label }
   supabase: { url: "", anonKey: "" },

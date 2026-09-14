@@ -20,7 +20,7 @@ export function render(state, root) {
         <span class="muted small">${d.used || 0} / ${d.available} min planned</span>
       </div>
       ${d.slots.length ? d.slots.map((sl) => `
-        <div class="slot">
+        <div class="slot ${sl.kind === "break" ? "break" : ""}">
           <span class="time">${sl.start}</span>
           <div class="what"><div>${esc(sl.what)}</div><div class="small muted">${esc(sl.labels)}</div></div>
           <span class="mins">${sl.mins}m</span>
@@ -70,6 +70,16 @@ export function render(state, root) {
             <span class="small muted" style="flex:1">Minutes per point <b id="mppVal">${s.baseMinutesPerPoint}</b></span>
             <input id="mpp" type="range" min="0.3" max="3" step="0.1" value="${s.baseMinutesPerPoint}" style="flex:1;accent-color:var(--accent)" />
           </label>
+          <div class="flex" style="gap:10px;margin-bottom:12px">
+            <label class="col" style="flex:1">
+              <span class="small muted">Break every (min)</span>
+              <input id="breakEvery" type="number" min="0" max="120" step="5" value="${s.breakEveryMinutes}" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+            </label>
+            <label class="col" style="flex:1">
+              <span class="small muted">Break length (min) · 0 = off</span>
+              <input id="breakLen" type="number" min="0" max="60" step="5" value="${s.breakMinutes}" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+            </label>
+          </div>
           <button id="saveStudy" class="btn btn-primary">Save &amp; regenerate</button>
         </div>
 
@@ -87,6 +97,8 @@ export function render(state, root) {
     st.studySlots = [{ start: root.querySelector("#winStart").value, end: root.querySelector("#winEnd").value, label: "Evening" }];
     st.maxStudyMinutesPerDay = +root.querySelector("#dailyMax").value;
     st.baseMinutesPerPoint = +root.querySelector("#mpp").value;
+    st.breakEveryMinutes = +root.querySelector("#breakEvery").value;
+    st.breakMinutes = +root.querySelector("#breakLen").value;
     saveSettings();
     render(state, root);
   });
