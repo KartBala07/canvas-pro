@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canvas Pro</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">◧</span>
+        <span class="brand-name">Canvas&nbsp;Pro</span>
+        <span id="versionBadge" class="badge badge-beta">BETA</span>
+      </div>
+      <div class="topbar-right">
+        <button id="refreshBtn" class="btn btn-ghost" title="Refresh data">Refresh</button>
+        <span id="syncState" class="sync-state"></span>
+        <button id="userBtn" class="user-chip" title="Account / settings"></button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+        <button class="tab-btn" data-tab="assignments">Assignments</button>
+        <button class="tab-btn" data-tab="todo">To-Do</button>
+        <button class="tab-btn" data-tab="grades">Grades</button>
+        <button class="tab-btn" data-tab="study">Study Plan</button>
+        <button class="tab-btn" data-tab="curve">Curve Calc</button>
+        <button class="tab-btn" data-tab="settings">Settings</button>
+      </nav>
+
+      <main id="mainContent" class="main">
+        <div class="loading" id="globalLoading">
+          <div class="spinner"></div>
+          <p id="loadingText">Loading…</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="onboarding" class="onboarding hidden">
+    <div class="onboarding-card">
+      <h1>◧ Canvas Pro</h1>
+      <p class="subtitle">A better, grade-aware view of your Canvas classes.</p>
+      <p class="subtitle">Your access token stays on this device — it is never uploaded.</p>
+
+      <label class="field">
+        <span>Canvas base URL</span>
+        <input id="onCanvasUrl" type="url" placeholder="https://myschool.instructure.com" />
+      </label>
+
+      <label class="field">
+        <span>Canvas access token</span>
+        <input id="onToken" type="password" placeholder="Paste your token (Account → Settings → New Access Token)" />
+      </label>
+
+      <p class="hint error hidden" id="onboardingError"></p>
+
+      <button id="onConnect" class="btn btn-primary btn-block">Connect to Canvas</button>
+    </div>
+  </div>
+
+  <div id="toastWrap"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

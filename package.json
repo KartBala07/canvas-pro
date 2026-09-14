@@ -1,0 +1,12 @@
+{
+  "name": "canvas-pro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A grade-aware Canvas web app: dashboard, to-do, study plan, and curve calculator.",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000",
+    "check": "for f in js/*.js js/ui/*.js; do node --check \"$f\" || exit 1; done; echo 'syntax OK'"
+  }
+}
