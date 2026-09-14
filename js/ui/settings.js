@@ -62,6 +62,7 @@ export function render(state, root) {
         <select id="aiProvider">
           <option value="gemini" ${s.aiProvider === "gemini" ? "selected" : ""}>Google Gemini (API key)</option>
           <option value="openai" ${s.aiProvider === "openai" ? "selected" : ""}>OpenAI-compatible (OpenAI, Azure, Together, LocalAI, Groq…)</option>
+          <option value="openrouter" ${s.aiProvider === "openrouter" ? "selected" : ""}>OpenRouter (any model)</option>
           <option value="copilot" ${s.aiProvider === "copilot" ? "selected" : ""}>GitHub Copilot</option>
         </select>
       </div>
@@ -158,14 +159,16 @@ export function render(state, root) {
   const AI_HINTS = {
     gemini: "Google Gemini: uses Google's OpenAI-compatible endpoint. Get a free API key at Google AI Studio (aistudio.google.com) and paste it below.",
     openai: "OpenAI-compatible: works with OpenAI, Azure OpenAI, Groq, Together, LocalAI… Endpoint points at /v1/chat/completions.",
+    openrouter: "OpenRouter: one key, dozens of models (openrouter.ai). 'openrouter/auto' picks the best one for your request automatically.",
     copilot: "GitHub Copilot: uses api.githubcopilot.com. Needs a token from a GitHub account with an active Copilot subscription. Unofficial endpoint; may change.",
   };
   const AI_URLS = {
     gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     openai: "https://api.openai.com/v1/chat/completions",
+    openrouter: "https://openrouter.ai/api/v1/chat/completions",
     copilot: "https://api.githubcopilot.com/chat/completions",
   };
-  const AI_MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4o", copilot: "gpt-4o" };
+  const AI_MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4o", openrouter: "openrouter/auto", copilot: "gpt-4o" };
   const KNOWN_DEFAULTS = Object.values(AI_MODELS);
   const setAiHint = () => {
     const sel = root.querySelector("#aiProvider");
