@@ -146,10 +146,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_AI(self):
         try:
-            self._do_AI()
+            self._do_ai_impl()
         except Exception as e:
-            # Never let an AI call crash the handler (that drops the connection
-            # and browsers report "Failed to fetch"). Always reply with JSON.
             print("AI route error:", traceback.format_exc())
             self.send_error(500, "AI proxy internal error")
         finally:
@@ -158,7 +156,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
-    def _do_AI(self):
+    def _send_json(self, code, data, ctype="application/json"):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype or "application/json; charset=utf-8")
+        sess = getattr(self, "_ai_session", None)
+        if sess:
+            self.send_header("X-AI-Session", str(sess))
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _do_ai_impl(self):
+        provider = (self.headers.get("X-AI-Provider") or "openai").lower()
+        if provider == "opencode":
+            return self._do_opencode()
         body = self._read_body()
         url = self.headers.get("X-AI-Url", "").strip()
         if not url:
@@ -175,21 +186,73 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             resp = urllib.request.urlopen(req, timeout=240)
         except urllib.error.HTTPError as e:
             err = e.read()[:2000]
-            self.send_response(e.code)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(err)))
-            self.end_headers()
-            self.wfile.write(err)
-            return
+            return self._send_json(e.code, err, (e.headers.get("Content-Type") or "application/json").split(";")[0])
         except Exception as e:
             return self.send_error(502, "AI upstream error: " + str(e)[:200])
         data = resp.read()
-        self.send_response(resp.getcode() or 200)
-        ctype = (resp.headers.get("Content-Type") or "application/json; charset=utf-8").split(";")[0]
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        self._send_json(resp.getcode() or 200, data, (resp.headers.get("Content-Type") or "application/json").split(";")[0])
+
+    def _do_opencode(self):
+        body = self._read_body()
+        base = (self.headers.get("X-AI-Url") or "http://localhost:4096").strip().rstrip("/")
+        sid = (self.headers.get("X-AI-Session") or "").strip()
+        payload = {}
+        try:
+            payload = json.loads(body)
+        except Exception:
+            pass
+        msgs = payload.get("messages") or []
+        last_user = ""
+        for m in reversed(msgs):
+            c = m.get("content")
+            if m.get("role") == "user" and isinstance(c, str) and c.strip():
+                last_user = c
+                break
+        model = payload.get("model")
+
+        resp = None
+        for attempt in (1, 2):
+            try:
+                if not sid:
+                    sid = self._oc_create(base)
+                msgbody = {"parts": [{"type": "text", "text": last_user or "(empty prompt)"}]}
+                if model:
+                    msgbody["model"] = model
+                resp = self._oc_post(base, sid, msgbody)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 404 and attempt == 1:
+                    self._oc_delete(base, sid)
+                    sid = ""
+                    continue
+                err = e.read()[:2000]
+                return self._send_json(e.code, err or json.dumps({"error": {"message": "opencode HTTP " + str(e.code)}}).encode())
+            except Exception as e:
+                return self.send_error(502, "Cannot reach opencode serve at %s (%s). Start it with `opencode serve`." % (base, str(e)[:120]))
+        self._ai_session = sid
+        parts = (resp or {}).get("parts") or []
+        texts = [p.get("text", "") for p in parts if p.get("type") == "text" and (p.get("text") or "").strip()]
+        reply = "\n".join(texts).strip() or "(no text reply from opencode)"
+        self._send_json(200, json.dumps({"choices": [{"message": {"role": "assistant", "content": reply}}]}).encode(), "application/json")
+
+    def _oc_create(self, base):
+        req = urllib.request.Request(base + "/session", data=b'{"title":"Canvas Pro"}',
+                                     headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=30) as r:
+            sess = json.loads(r.read())
+        return (sess or {}).get("id")
+
+    def _oc_delete(self, base, sid):
+        try:
+            urllib.request.urlopen(urllib.request.Request(base + "/session/" + sid, method="DELETE"), timeout=15)
+        except Exception:
+            pass
+
+    def _oc_post(self, base, sid, msgbody):
+        req = urllib.request.Request(base + "/session/" + sid + "/message", data=json.dumps(msgbody).encode(),
+                                     headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=900) as r:
+            return json.loads(r.read())
 
 def pick_port():
     for port in range(PORT_START, PORT_START + 20):

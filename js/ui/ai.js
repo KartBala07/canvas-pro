@@ -26,6 +26,8 @@ function snapshot(state) {
 export function render(state, root) {
   const s = settings();
   const messages = [];
+  let ocSession = null;
+  const isOc = () => settings().aiProvider === "opencode";
   let ctxOn = true;
   let busy = false;
 
@@ -33,7 +35,7 @@ export function render(state, root) {
     <h1>AI Assistant</h1>
     <p class="subtitle">Chat with a model that already knows your courses, grades, and open work. Configure the provider in <b>Settings → AI</b> first.</p>
 
-    ${!s.aiKey ? `<div class="card mt"><b>🔑 No AI key set yet.</b> Go to <b>Settings → AI</b> and paste a GitHub token (Copilot) or an OpenAI-compatible API key. Your key stays on this computer.</div>` : ""}
+    ${(!s.aiKey && s.aiProvider !== "opencode") ? `<div class="card mt"><b>🔑 No AI key set yet.</b> Go to <b>Settings → AI</b> and pick a provider + key (or choose <b>opencode</b> to use your local opencode — no key needed).</div>` : ""}
 
     <div class="card chat-card mt">
       <div class="chat-wrap" id="chatWrap" aria-live="polite"></div>
@@ -55,7 +57,7 @@ export function render(state, root) {
   const ctx = root.querySelector("#aiCtx");
   ctx.addEventListener("change", () => ctxOn = ctx.checked);
   root.querySelector("#aiClear").addEventListener("click", () => {
-    messages.length = 0; wrap.innerHTML = "";
+    ocSession = null; messages.length = 0; wrap.innerHTML = "";
   });
 
   inp.addEventListener("keydown", (e) => {
@@ -78,22 +80,34 @@ export function render(state, root) {
     if (!text) return;
     inp.value = "";
     addMsg("user", text);
-    let body;
+    const prov = s.aiProvider || "openai";
     try {
-      body = s.aiKey ? { model: s.aiModel || undefined } : {};
-      if (!Object.keys(body).length) throw new Error("No AI key configured — add one in Settings → AI.");
-      const messagesWithCtx = messages.map((m) => ({ ...m }));
-      if (ctxOn) messagesWithCtx.splice(0, 0, { role: "system", content: snapshot(state) });
-      body.messages = messagesWithCtx;
+      if (prov !== "opencode" && !s.aiKey) throw new Error("No AI key configured — add one in Settings → AI.");
+      const body = { model: s.aiModel || undefined };
+      if (prov === "opencode") {
+        // opencode keeps conversation in its own session; we send one fresh
+        // user message (with Canvas context prefixed) and reuse the session.
+        const withCtx = ctxOn ? `[My Canvas context]\n${snapshot(state)}\n\n---\n${text}` : text;
+        body.messages = [{ role: "user", content: withCtx }];
+      } else {
+        const messagesWithCtx = messages.map((m) => ({ ...m }));
+        if (ctxOn) messagesWithCtx.splice(0, 0, { role: "system", content: snapshot(state) });
+        body.messages = messagesWithCtx;
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        "X-AI-Provider": prov,
+        "X-AI-Url": s.aiUrl || (prov === "opencode" ? "http://localhost:4096" : "https://api.openai.com/v1/chat/completions"),
+      };
+      if (s.aiKey) headers["X-AI-Key"] = s.aiKey;
+      if (prov === "opencode") headers["X-AI-Session"] = ocSession || "";
       const resp = await fetch("/api/ai", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-AI-Key": s.aiKey || "",
-          "X-AI-Url": s.aiUrl || "https://api.openai.com/v1/chat/completions",
-        },
+        headers,
         body: JSON.stringify(body),
       });
+      const sid = resp.headers.get("X-AI-Session");
+      if (sid) ocSession = sid;
       const rawText = await resp.text();
       let data = {};
       try { data = JSON.parse(rawText); } catch (e) {}
@@ -103,6 +117,7 @@ export function render(state, root) {
           const m = /<p>(.*?)<\/p>/.exec(rawText);
           why = m ? m[1].replace(/<[^>]*>/g, "") : rawText.slice(0, 200);
         }
+        if (prov === "opencode" && !why) why = "Local opencode server refused. Is `opencode serve` running? (Start it in a terminal: `opencode serve`)";
         throw new Error(why || ("HTTP " + resp.status));
       }
       const content = data.choices?.[0]?.message?.content;
@@ -111,10 +126,12 @@ export function render(state, root) {
     } catch (err) {
       const nf = (err instanceof TypeError && /failed to fetch/i.test(err.message)) || /networkerror/i.test(err.message || "");
       const msg = nf
-        ? "⚠️ Couldn't reach the local server (\"Failed to fetch\"). This is not an API-key problem — make sure the server has been restarted with the latest code: stop it with Ctrl+C, then run `npm start` again, and reload this page."
+        ? prov === "opencode"
+          ? "⚠️ Couldn't reach `opencode serve` (is it running? Start it in a terminal: `opencode serve`)."
+          : "⚠️ Couldn't reach the local server (\"Failed to fetch\"). This is not an API-key problem — make sure the server has been restarted with the latest code: stop it with Ctrl+C, then run `npm start` again, and reload this page."
         : "⚠️ " + (err.message || String(err));
       addMsg("bot", msg);
-      if (nf) toast("No response from local server — restart it (Ctrl+C, then npm start).", "err");
+      if (nf && prov !== "opencode") toast("No response from local server — restart it (Ctrl+C, then npm start).", "err");
     }
   }
 }

@@ -60,6 +60,7 @@ export function render(state, root) {
       <p class="small muted">Powered the AI tab. Your key is stored locally and only ever sent to the provider endpoint you choose. GitHub Copilot works best with a GitHub token from an account that has Copilot.</p>
       <div class="field"><span>Provider</span>
         <select id="aiProvider">
+          <option value="opencode" ${s.aiProvider === "opencode" ? "selected" : ""}>opencode (local, no key)</option>
           <option value="gemini" ${s.aiProvider === "gemini" ? "selected" : ""}>Google Gemini (API key)</option>
           <option value="openai" ${s.aiProvider === "openai" ? "selected" : ""}>OpenAI-compatible (OpenAI, Azure, Together, LocalAI, Groq…)</option>
           <option value="openrouter" ${s.aiProvider === "openrouter" ? "selected" : ""}>OpenRouter (any model)</option>
@@ -161,18 +162,20 @@ export function render(state, root) {
   root.querySelector("#setBlockMail")?.addEventListener("change", (e) => { s.blockPersonalEmails = e.target.checked; save(); });
 
   const AI_HINTS = {
+    opencode: "opencode: no API key needed. Talks to your local `opencode serve` (default http://localhost:4096) and uses the model/tools opencode is configured with. Leave Key blank; model blank = opencode's default.",
     gemini: "Google Gemini: uses Google's OpenAI-compatible endpoint. Get a free API key at Google AI Studio (aistudio.google.com) and paste it below.",
     openai: "OpenAI-compatible: works with OpenAI, Azure OpenAI, Groq, Together, LocalAI… Endpoint points at /v1/chat/completions.",
     openrouter: "OpenRouter: one key, dozens of models (openrouter.ai). 'openrouter/auto' picks the best one for your request automatically.",
     copilot: "GitHub Copilot: uses api.githubcopilot.com. Needs a token from a GitHub account with an active Copilot subscription. Unofficial endpoint; may change.",
   };
   const AI_URLS = {
+    opencode: "http://localhost:4096",
     gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     openai: "https://api.openai.com/v1/chat/completions",
     openrouter: "https://openrouter.ai/api/v1/chat/completions",
     copilot: "https://api.githubcopilot.com/chat/completions",
   };
-  const AI_MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4o", openrouter: "openrouter/auto", copilot: "gpt-4o" };
+  const AI_MODELS = { opencode: "", gemini: "gemini-3.8-flash", openai: "gpt-4o", openrouter: "openrouter/auto", copilot: "gpt-4o" };
   const KNOWN_DEFAULTS = Object.values(AI_MODELS);
   const setAiHint = () => {
     const sel = root.querySelector("#aiProvider");
@@ -207,20 +210,28 @@ export function render(state, root) {
     if (!s.aiUrl) { st.textContent = "Endpoint URL is empty."; return; }
     st.textContent = "Testing…";
     st.style.color = "var(--muted)";
+    const prov = s.aiProvider || "openai";
     try {
       const resp = await fetch("/api/ai", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-AI-Url": s.aiUrl, "X-AI-Key": s.aiKey || "" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-AI-Provider": prov,
+          "X-AI-Url": s.aiUrl || AI_URLS[prov] || "https://api.openai.com/v1/chat/completions",
+          "X-AI-Key": s.aiKey || "",
+        },
         body: JSON.stringify({ model: s.aiModel || undefined, messages: [{ role: "user", content: "Reply with the single word: OK" }] }),
       });
       const raw = await resp.text();
       let data = {};
       try { data = JSON.parse(raw); } catch (e) {}
       if (!resp.ok) {
-        throw new Error(data.error?.message || data.message || ("HTTP " + resp.status));
+        let why = data.error?.message || data.message || "";
+        if (prov === "opencode" && !why) why = "Is `opencode serve` running? Start it in a terminal.";
+        throw new Error(why || ("HTTP " + resp.status));
       }
       const reply = data.choices?.[0]?.message?.content;
-      st.textContent = reply != null ? `✓ Connected — model says: ${String(reply).slice(0, 60)}` : "✓ Connected";
+      st.textContent = reply != null ? `✓ Connected — reply: ${String(reply).slice(0, 60)}` : "✓ Connected";
       st.style.color = "var(--green)";
     } catch (e) {
       st.textContent = `✗ ${(e.message || String(e)).slice(0, 140)}`;
