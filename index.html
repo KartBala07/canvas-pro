@@ -17,14 +17,14 @@
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=221" />
+  <link rel="stylesheet" href="css/styles.css?v=223" />
   <script>
     // Fail-safe: the module app hides both screens until it boots. If it
     // doesn't boot, surface the connect screen + an explanation instead of
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    window.__rev = "b28";
+    window.__rev = "b29";
     function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
@@ -72,6 +72,7 @@
         <button class="tab-btn" data-tab="assignments">Assignments</button>
         <button class="tab-btn" data-tab="tests">Tests</button>
         <button class="tab-btn" data-tab="documents">Documents</button>
+        <button class="tab-btn" data-tab="announcements">Announcements</button>
         <button class="tab-btn" data-tab="todo">To-Do</button>
         <button class="tab-btn" data-tab="grades">Grades</button>
         <button class="tab-btn" data-tab="study">Study Plan</button>
@@ -115,6 +116,6 @@
 
   <div id="toastWrap"></div>
 
-  <script type="module" src="js/app.js?v=192"></script>
+  <script type="module" src="js/app.js?v=193"></script>
 </body>
 </html>

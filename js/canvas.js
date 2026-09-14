@@ -108,6 +108,15 @@ export function getCourseFiles(courseId) {
   return all(`/api/v1/courses/${courseId}/files?sort=updated_at&order=desc`);
 }
 
+export function getAnnouncements(contextCodes, cutoffDays = 60) {
+  const start = new Date(Date.now() - cutoffDays * 864e5).toISOString();
+  return all(`/api/v1/announcements?${contextCodes.map((c) => "context_codes[]=" + encodeURIComponent(c)).join("&")}&start_date=${encodeURIComponent(start)}`);
+}
+
+export function markAnnouncementRead(courseId, topicId) {
+  return api(`/api/v1/courses/${courseId}/discussion_topics/${topicId}/read`, { method: "PUT" });
+}
+
 // Handouts are often posted as Modules ("File") items instead of Files.
 // Module items usually stay readable for students even when the Files API
 // is scope-locked, so this is the Documents fallback.

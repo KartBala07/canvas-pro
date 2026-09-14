@@ -629,6 +629,26 @@ tr.done td:first-child { text-decoration: none; }
 .doc-open .btn { white-space: nowrap; }
 tbody tr:last-child td { border-bottom: none; }
 
+/* ---------- Announcements ---------- */
+.ann-item { padding: 4px 18px; }
+.ann-item.read { filter: none; }
+.ann-item details > summary { cursor: pointer; list-style: none; }
+.ann-item details > summary::-webkit-details-marker { display: none; }
+.ann-head { display: flex; align-items: center; gap: 10px; }
+.ann-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 1px solid var(--accent); flex: none; }
+.ann-item.read .ann-dot { background: transparent; border-color: var(--muted); }
+.ann-title { flex: 1; font-size: 15px; font-weight: 600; margin-top: 8px; }
+.ann-date { flex: none; margin-top: 8px; }
+.ann-meta { padding-left: 18px; margin: 2px 0 6px; }
+.ann-body {
+  padding: 6px 4px 4px 18px;
+  color: var(--text); font-size: 14px; line-height: 1.55;
+  border-top: 1px dashed var(--border);
+}
+.ann-body img { max-width: 100%; border-radius: 10px; }
+.ann-body a { color: var(--accent); }
+.ann-body p { margin: 8px 0; }
+
 .done-collapse { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
 .done-collapse summary {
   cursor: pointer; color: var(--muted); font-size: 13px;

@@ -21,6 +21,7 @@ import { render as renderStudy } from "./ui/study.js";
 import { render as renderCurve } from "./ui/curveview.js";
 import { render as renderSettings } from "./ui/settings.js";
 import { render as renderDocuments } from "./ui/documents.js";
+import { render as renderAnnouncements } from "./ui/announcements.js";
 
 const VIEWS = {
   dashboard: renderDashboard,
@@ -32,6 +33,7 @@ const VIEWS = {
   curve: renderCurve,
   settings: renderSettings,
   documents: renderDocuments,
+  announcements: renderAnnouncements,
 };
 
 const state = { data: cacheData(), profile: null, isLoggedIn: false };
