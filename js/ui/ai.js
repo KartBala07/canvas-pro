@@ -94,8 +94,17 @@ export function render(state, root) {
         },
         body: JSON.stringify(body),
       });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error((data.error && (data.error.message || (data.error.message_extras && data.error.message_extras[0]))) || ("HTTP " + resp.status));
+      const rawText = await resp.text();
+      let data = {};
+      try { data = JSON.parse(rawText); } catch (e) {}
+      if (!resp.ok) {
+        let why = data.error?.message || data.message || (data.error && (data.error.code || data.error.status)) || "";
+        if (!why && rawText.trim().startsWith("<")) {
+          const m = /<p>(.*?)<\/p>/.exec(rawText);
+          why = m ? m[1].replace(/<[^>]*>/g, "") : rawText.slice(0, 200);
+        }
+        throw new Error(why || ("HTTP " + resp.status));
+      }
       const content = data.choices?.[0]?.message?.content;
       if (!content) throw new Error("No reply content in response");
       addMsg("bot", content);

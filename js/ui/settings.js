@@ -72,7 +72,11 @@ export function render(state, root) {
         <label class="field"><span>Key / token <span class="muted small">(never leaves your machine)</span></span><input id="aiKey" type="password" value="${esc(s.aiKey)}" autocomplete="off" /></label>
       </div>
       <p class="small muted mt" id="aiHint"></p>
-      <div class="mt"><button id="aiSaveNow" class="btn btn-primary btn-small">Save AI settings</button></div>
+      <div class="flex mt">
+        <button id="aiSaveNow" class="btn btn-primary btn-small">Save AI settings</button>
+        <button id="aiTest" class="btn btn-small">Test connection</button>
+        <span id="aiTestStatus" class="small muted"></span>
+      </div>
     </div>
 
     <div class="card mt">
@@ -191,6 +195,37 @@ export function render(state, root) {
     s.aiKey = root.querySelector("#aiKey").value.trim();
     save();
     toast("AI settings saved.");
+  });
+
+  root.querySelector("#aiTest")?.addEventListener("click", async () => {
+    s.aiProvider = root.querySelector("#aiProvider").value;
+    s.aiUrl = root.querySelector("#aiUrl").value.trim();
+    s.aiModel = root.querySelector("#aiModel").value.trim();
+    s.aiKey = root.querySelector("#aiKey").value.trim();
+    saveSettings();
+    const st = root.querySelector("#aiTestStatus");
+    if (!s.aiUrl) { st.textContent = "Endpoint URL is empty."; return; }
+    st.textContent = "Testing…";
+    st.style.color = "var(--muted)";
+    try {
+      const resp = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-AI-Url": s.aiUrl, "X-AI-Key": s.aiKey || "" },
+        body: JSON.stringify({ model: s.aiModel || undefined, messages: [{ role: "user", content: "Reply with the single word: OK" }] }),
+      });
+      const raw = await resp.text();
+      let data = {};
+      try { data = JSON.parse(raw); } catch (e) {}
+      if (!resp.ok) {
+        throw new Error(data.error?.message || data.message || ("HTTP " + resp.status));
+      }
+      const reply = data.choices?.[0]?.message?.content;
+      st.textContent = reply != null ? `✓ Connected — model says: ${String(reply).slice(0, 60)}` : "✓ Connected";
+      st.style.color = "var(--green)";
+    } catch (e) {
+      st.textContent = `✗ ${(e.message || String(e)).slice(0, 140)}`;
+      st.style.color = "var(--red)";
+    }
   });
 
   root.querySelector("#tgtRegular")?.addEventListener("change", (e) => { s.targets.regular = +e.target.value; save(); });
