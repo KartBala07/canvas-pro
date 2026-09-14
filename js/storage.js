@@ -92,6 +92,25 @@ export function clearDone() {
   localStorage.setItem(DONE_KEY, "[]");
 }
 
+// ---------- effort log (minutes actually spent, adapts estimates) ----------
+const TIME_KEY = PREFIX + "timeLog";
+
+export function timeLogs() {
+  try { return JSON.parse(localStorage.getItem(TIME_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+export function logTime(taskId, mins, estimate) {
+  const logs = timeLogs();
+  const cur = logs[taskId] || { mins: 0, count: 0, lastEst: null };
+  cur.mins = (cur.mins || 0) + mins;
+  cur.count = (cur.count || 0) + 1;
+  if (estimate != null) cur.lastEst = estimate;
+  logs[taskId] = cur;
+  localStorage.setItem(TIME_KEY, JSON.stringify(logs));
+  return { total: cur.mins, count: cur.count };
+}
+
 // ---------- Supabase ----------
 const EMAIL_RE = /^[^@]+@([^@]+)$/;
 

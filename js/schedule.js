@@ -1,4 +1,4 @@
-import { settings } from "./storage.js";
+import { settings, timeLogs } from "./storage.js";
 import { recommendedOrder, scoreTask } from "./priorities.js";
 import { clamp, daysUntil } from "./utils.js";
 
@@ -11,13 +11,50 @@ function difficultyFactor(task) {
   return s.difficulty[task.type] ?? 1.4;
 }
 
-function targetMinutes(task) {
+// Base estimate, before any adaptive learning kicks in.
+export function rawEstimate(task) {
   const base = task.baseMinutes || (task.pointsPossible || 0) * settings().baseMinutesPerPoint || 20;
   const factor = difficultyFactor(task);
   let mins = Math.round(base * factor);
   if (task.type === "exam") mins = clamp(mins * 2.5, 30, 300);
   else if (task.type === "quiz") mins = clamp(mins, 15, 90);
   else mins = clamp(mins, 10, 120);
+  return mins;
+}
+
+// Aggregates logged effort per course: sum(actual) / sum(estimated-at-log-time).
+function learnedMap(tasks) {
+  const logs = timeLogs();
+  const map = new Map();
+  if (!Object.keys(logs).length) return map;
+  const courseOf = new Map(tasks.map((t) => [t.id, t.courseId]));
+  for (const [tid, rec] of Object.entries(logs)) {
+    const courseId = courseOf.get(tid);
+    if (courseId == null) continue;
+    const agg = map.get(courseId) || { log: 0, est: 0, n: 0 };
+    agg.log += +rec.mins || 0;
+    agg.est += +rec.lastEst || (+rec.mins || 0);
+    agg.n += 1;
+    map.set(courseId, agg);
+  }
+  return map;
+}
+
+// Public summary for the UI (Study Plan, task detail).
+export function courseFactors(tasks) {
+  const out = {};
+  for (const [courseId, agg] of learnedMap(tasks)) {
+    if (agg.est > 0) {
+      out[courseId] = { factor: clamp(agg.log / agg.est, 0.4, 2.5), logged: Math.round(agg.log), n: agg.n || 0 };
+    }
+  }
+  return out;
+}
+
+function targetMinutes(task, byCourse) {
+  let mins = rawEstimate(task);
+  const agg = byCourse.get(task.courseId);
+  if (agg && agg.est > 0) mins = Math.round(mins * clamp(agg.log / agg.est, 0.4, 2.5));
   return mins;
 }
 
@@ -72,6 +109,7 @@ export function generateSchedule(courses, tasks) {
 
   const open = tasks.filter((t) => !t.submitted && daysUntil(t.dueAt) < 30 && t.dueAt);
   const ranked = recommendedOrder(open, courses);
+  const byCourse = learnedMap(tasks);
 
   const exams = ranked.filter((r) => r.task.type === "exam");
   const others = ranked.filter((r) => r.task.type !== "exam");
@@ -79,7 +117,7 @@ export function generateSchedule(courses, tasks) {
   function placeOnDay(idx, item, placeAtStart) {
     const d = days[idx];
     if (d.remaining < 10) return false;
-    const mins = targetMinutes(item.task);
+    const mins = targetMinutes(item.task, byCourse);
     const take = Math.min(d.remaining, mins);
     const entry = {
       kind: item.task.type === "exam" ? "study" : "homework",
@@ -122,7 +160,7 @@ export function generateSchedule(courses, tasks) {
     for (let i = startIdx; i <= Math.min(dueIdx, HORIZON - 1); i++) range.push(i);
     const weights = range.map((i, k) => (k === range.length - 1 && i === dueIdx ? 0.5 : 1 + k));
     const wsum = weights.reduce((a, b) => a + b, 0);
-    const study = targetMinutes(r.task);
+    const study = targetMinutes(r.task, byCourse);
     for (let k = 0; k < range.length; k++) {
       const idx = range[k];
       if (!days[idx] || days[idx].remaining < 10) continue;

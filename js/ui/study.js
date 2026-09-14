@@ -1,6 +1,6 @@
 import { esc } from "../utils.js";
-import { generateSchedule, scheduleSummary } from "../schedule.js";
-import { settings, saveSettings, doneIds } from "../storage.js";
+import { generateSchedule, scheduleSummary, courseFactors } from "../schedule.js";
+import { settings, saveSettings, doneIds, timeLogs } from "../storage.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data;
@@ -8,6 +8,8 @@ export function render(state, root) {
   const merged = [...tasks, ...todos.filter((t) => !tasks.some((x) => x.id === t.id))];
   const open = merged.filter((t) => !t.submitted && !done.has(t.id) && t.dueAt);
   const s = settings();
+  const factors = courseFactors(merged);
+  const logs = timeLogs();
 
   const sched = generateSchedule(courses, open);
   const sum = scheduleSummary(sched.days);
@@ -19,17 +21,22 @@ export function render(state, root) {
         <h3>${d.label}</h3>
         <span class="muted small">${d.used || 0} / ${d.available} min planned</span>
       </div>
-      ${d.slots.length ? d.slots.map((sl) => `
+      ${d.slots.length ? d.slots.map((sl) => {
+        const loggedMins = logs[sl.taskId]?.mins;
+        return `
         <div class="slot ${sl.kind === "break" ? "break" : ""}">
           <span class="time">${sl.start}</span>
-          <div class="what"><div>${esc(sl.what)}</div><div class="small muted">${esc(sl.labels)}</div></div>
+          <div class="what"><div>${esc(sl.what)}</div><div class="small muted">${esc(sl.labels)}${loggedMins ? ` · spent ${loggedMins}m` : ""}</div></div>
           <span class="mins">${sl.mins}m</span>
-        </div>`).join("") : `<p class="muted small">Free / flex time. Add an exam-adjacent day to trigger test prep.</p>`}
+        </div>`;
+      }).join("") : `<p class="muted small">Free / flex time. Add an exam-adjacent day to trigger test prep.</p>`}
     </div>`).join("");
 
-  const courseDifficulty = courses.map((c) => `
+  const courseDifficulty = courses.map((c) => {
+    const f = factors[c.id];
+    return `
     <div class="row">
-      <span class="small muted" style="flex:1">${esc(c.name)}</span>
+      <span class="small muted" style="flex:1">${esc(c.name)}${f ? `<div class="small">adapted ${f.factor.toFixed(2)}× · ${f.n} ${f.n === 1 ? "log" : "logs"}</div>` : ""}</span>
       <select class="course-diff" data-course="${c.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)">
         <option value="" ${!s.difficultyOverrides?.[c.id] ? "selected" : ""}>Default</option>
         <option value="0.6" ${s.difficultyOverrides?.[c.id]?.factor === 0.6 ? "selected" : ""}>Light</option>
@@ -37,7 +44,8 @@ export function render(state, root) {
         <option value="1.6" ${s.difficultyOverrides?.[c.id]?.factor === 1.6 ? "selected" : ""}>Heavy</option>
         <option value="2.2" ${s.difficultyOverrides?.[c.id]?.factor === 2.2 ? "selected" : ""}>Brutal</option>
       </select>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   root.innerHTML = `
     <h1>Study Plan</h1>
