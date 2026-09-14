@@ -43,7 +43,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             sys.stderr.write("  %s\n" % msg)
 
     # ---- Canvas API proxy (local only; token never leaves this machine) ----
-    def do_CANVAS(self):
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        return self.rfile.read(length) if length else None
+
+    def do_CANVAS(self, method="GET", body=None):
         parsed = urllib.parse.urlsplit(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         canvas_path = qs.get("p", [""])[0]
@@ -55,31 +59,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
 
         target = base + canvas_path
-        req = urllib.request.Request(target, headers={"Authorization": "Bearer " + token})
+        headers = {"Authorization": "Bearer " + token}
+        ct = self.headers.get("Content-Type")
+        if ct:
+            headers["Content-Type"] = ct
+        req = urllib.request.Request(target, data=body, method=method, headers=headers)
         try:
             resp = urllib.request.urlopen(req, timeout=60)
         except urllib.error.HTTPError as e:
-            body = e.read()
+            body_resp = e.read()
             self.send_response(e.code)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(len(body_resp)))
             self.end_headers()
-            self.wfile.write(body)
+            self.wfile.write(body_resp)
             return
         except Exception as e:
             self.send_error(502, "Proxy to Canvas failed: %s" % e)
             return
 
-        body = resp.read()
+        body_out = resp.read()
         self.send_response(resp.status)
         self.send_header("Content-Type", resp.headers.get_content_type() or "application/json")
         rel = resp.headers.get("Link")
         if rel:
             host = self.headers.get("Host", "localhost:" + str(PORT_START))
             self.send_header("Link", rewrite_pagelink(rel, host))
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(body_out)))
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(body_out)
 
     # ---- file download passthrough (token-authenticated, streams bytes) ----
     def do_DL(self):
@@ -118,6 +126,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith("/api/dl?") or self.path.startswith("/api/dl"):
             return self.do_DL()
         return super().do_GET()
+
+    def do_POST(self):
+        if self.path.startswith("/api/canvas"):
+            return self.do_CANVAS(method="POST", body=self._read_body())
+        return super().do_POST()
+
+    def do_PUT(self):
+        if self.path.startswith("/api/canvas"):
+            return self.do_CANVAS(method="PUT", body=self._read_body())
+        return super().do_PUT()
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/canvas"):
+            return self.do_CANVAS(method="DELETE", body=self._read_body())
+        return super().do_DELETE()
 
 def pick_port():
     for port in range(PORT_START, PORT_START + 20):

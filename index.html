@@ -17,14 +17,14 @@
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=223" />
+  <link rel="stylesheet" href="css/styles.css?v=224" />
   <script>
     // Fail-safe: the module app hides both screens until it boots. If it
     // doesn't boot, surface the connect screen + an explanation instead of
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    window.__rev = "b29";
+    window.__rev = "b30";
     function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
@@ -68,16 +68,25 @@
 
     <div class="layout">
       <nav class="sidebar">
-        <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-        <button class="tab-btn" data-tab="assignments">Assignments</button>
-        <button class="tab-btn" data-tab="tests">Tests</button>
-        <button class="tab-btn" data-tab="documents">Documents</button>
-        <button class="tab-btn" data-tab="announcements">Announcements</button>
-        <button class="tab-btn" data-tab="todo">To-Do</button>
-        <button class="tab-btn" data-tab="grades">Grades</button>
-        <button class="tab-btn" data-tab="study">Study Plan</button>
-        <button class="tab-btn" data-tab="curve">Curve Calc</button>
-        <button class="tab-btn" data-tab="settings">Settings</button>
+        <div class="nav-group">Home</div>
+        <button class="tab-btn active" data-tab="dashboard"><span class="ti">📊</span>Dashboard</button>
+
+        <div class="nav-group">Classwork</div>
+        <button class="tab-btn" data-tab="assignments"><span class="ti">📝</span>Assignments</button>
+        <button class="tab-btn" data-tab="tests"><span class="ti">🧪</span>Tests</button>
+        <button class="tab-btn" data-tab="todo"><span class="ti">✅</span>To-Do</button>
+        <button class="tab-btn" data-tab="grades"><span class="ti">🎯</span>Grades</button>
+
+        <div class="nav-group">Study</div>
+        <button class="tab-btn" data-tab="study"><span class="ti">🧠</span>Study Plan</button>
+        <button class="tab-btn" data-tab="curve"><span class="ti">📈</span>Curve Calc</button>
+
+        <div class="nav-group">Resources</div>
+        <button class="tab-btn" data-tab="documents"><span class="ti">📁</span>Documents</button>
+        <button class="tab-btn" data-tab="announcements"><span class="ti">📣</span>Announcements</button>
+
+        <div class="nav-group">System</div>
+        <button class="tab-btn" data-tab="settings"><span class="ti">⚙️</span>Settings</button>
       </nav>
 
       <main id="mainContent" class="main"></main>
@@ -116,6 +125,6 @@
 
   <div id="toastWrap"></div>
 
-  <script type="module" src="js/app.js?v=193"></script>
+  <script type="module" src="js/app.js?v=194"></script>
 </body>
 </html>

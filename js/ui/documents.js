@@ -24,40 +24,89 @@ function kindFor(f) {
   return { icon: "📁", tag: (ct.split("/")[1] || "File").toUpperCase(), cls: "tag-blue" };
 }
 
-function downloadBlob(url, name) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+function closePreview() {
+  const ov = document.getElementById("filePreview");
+  if (ov) ov.remove();
+}
+
+function previewType(ct) {
+  if (/^image\//.test(ct)) return "image";
+  if (/^audio\//.test(ct)) return "audio";
+  if (/^video\//.test(ct)) return "video";
+  if (ct.includes("pdf")) return "pdf";
+  if (/^text\//.test(ct)) return "text";
+  return null;
+}
+
+function previewBody(kind, obj, blob) {
+  if (kind === "image") return `<img src="${obj}" alt="preview" style="max-width:100%;max-height:70vh;border-radius:12px" />`;
+  if (kind === "audio") return `<audio controls src="${obj}" style="width:100%"></audio>`;
+  if (kind === "video") return `<video controls src="${obj}" style="max-width:100%;max-height:70vh;border-radius:12px"></video>`;
+  if (kind === "pdf") return `<iframe src="${obj}" style="width:100%;height:70vh;border:none;border-radius:12px;background:#fff" title="Preview"></iframe>`;
+  if (kind === "text") return blob ? `<pre style="max-height:60vh;overflow:auto;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:13px;white-space:pre-wrap">${esc(blob)}</pre>` : "";
+  return null;
 }
 
 async function openFile(f) {
   const s = settings();
+  const base = s.canvasBaseUrl || "";
+  const cid = f._courseId;
+  const fid = f.id;
+  const onCanvas = `${base}/courses/${cid}/files/${fid}?preview=1`;
+
+  const show = (bodyHTML, foot) => {
+    closePreview();
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay";
+    ov.id = "filePreview";
+    ov.innerHTML = `
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h2>${esc(f.display_name || f.filename || "File")}</h2>
+            <div class="meta small muted">${esc(f._courseName || "")} · ${fmtSize(f.size)}${f.updated_at ? " · " + esc(f.updated_at.split("T")[0]) : ""}</div>
+          </div>
+          <div class="flex">
+            <a class="icon-btn" href="${esc(onCanvas)}" target="_blank" rel="noopener" title="Open in Canvas">↗</a>
+            <button class="icon-btn" id="prevClose" title="Close">✕</button>
+          </div>
+        </div>
+        <div id="prevBody">${bodyHTML || `<div class="muted">This file can't be previewed in the browser.</div>`}</div>
+        ${foot ? `<div class="modal-foot">${foot}</div>` : ""}
+      </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("#prevClose")) closePreview(); });
+  };
+
+  const url = canvas.fileDownloadUrl(base, cid, fid);
+  let blob;
   try {
-    const res = await fetch("/api/dl?u=" + encodeURIComponent(f.url || ""), {
-      headers: { "X-Canvas-Token": s.token, "X-Canvas-Base": s.canvasBaseUrl },
+    const res = await fetch("/api/dl?u=" + encodeURIComponent(url), {
+      headers: { "X-Canvas-Token": s.token, "X-Canvas-Base": base },
     });
     if (!res.ok) {
-      let msg = `Download failed (${res.status})`;
+      let msg = `Couldn't load file (${res.status})`;
       try { const j = await res.json(); msg = (j && j.message) || msg; } catch {}
       throw new Error(msg);
     }
-    const blob = await res.blob();
-    const name = (f.display_name || f.filename || "file").split("?")[0];
-    const ct = blob.type || f.content_type || "";
-    const previewable = /pdf|^image\/|^audio\/|^video\/|^text\//.test(ct);
-    const obj = URL.createObjectURL(blob);
-    if (previewable) {
-      const w = window.open(obj, "_blank");
-      if (!w) downloadBlob(obj, name);
-    } else {
-      downloadBlob(obj, name);
-    }
+    blob = await res.blob();
   } catch (e) {
-    toast("Couldn't open file: " + e.message, "err");
+    show(`<p class="error">${esc(e.message)}</p><p class="small muted">Your token may be missing the Files download scope, or the file is locked for this account.</p>`,
+      `<a class="btn" href="${esc(onCanvas)}" target="_blank" rel="noopener">Open in Canvas ↗</a>`);
+    return;
+  }
+
+  const ct = blob.type || f.content_type || "";
+  const kind = previewType(ct);
+  const obj = URL.createObjectURL(blob);
+
+  if (kind) {
+    let text = null;
+    if (kind === "text") text = await blob.text();
+    show(previewBody(kind, obj, text));
+  } else {
+    show(`<p class="muted">"${esc(f.display_name || f.filename)}" is a ${esc(ct || f.mime_class || "file")} — this type isn't viewable in an in-app preview.</p>`,
+      `<a class="btn" href="${esc(onCanvas)}" target="_blank" rel="noopener">Open in Canvas ↗</a>`);
   }
 }
 
@@ -65,7 +114,7 @@ export function fileRow(f, idx) {
   const k = kindFor(f);
   const link = !f.locked && f.url;
   const name = link
-    ? `<button class="doc-name doc-click" data-idx="${idx}" title="${f.locked ? "" : "Open / download"}">${esc(f.display_name || f.filename)}${f.locked ? " 🔒" : ""}</button>`
+    ? `<button class="doc-name doc-click" data-idx="${idx}" title="Preview">${esc(f.display_name || f.filename)}${f.locked ? " 🔒" : ""}</button>`
     : `<span class="doc-name muted">${esc(f.display_name || f.filename)}${f.locked ? " 🔒" : ""}</span>`;
   return `
     <tr>
@@ -73,7 +122,7 @@ export function fileRow(f, idx) {
       <td><span class="tag ${k.cls}">${k.tag}</span></td>
       <td class="small muted">${esc(f.size != null ? fmtSize(f.size) : "—")}</td>
       <td class="small muted">${f.updated_at ? fmtDate(f.updated_at.split("T")[0]) : "—"}</td>
-      ${link ? `<td class="doc-open"><button class="doc-click btn btn-ghost btn-small" data-idx="${idx}">Open ↗</button></td>` : "<td></td>"}
+      ${link ? `<td class="doc-open"><button class="doc-click btn btn-ghost btn-small" data-idx="${idx}">Preview</button></td>` : "<td></td>"}
     </tr>`;
 }
 
@@ -134,7 +183,7 @@ export async function render(state, root) {
     if (!files.length) return;
     if (g.source === "modules") fromModules += files.length;
     const start = allFiles.length;
-    allFiles.push(...files);
+    allFiles.push(...files.map((f) => ({ ...f, _courseId: g.course.id, _courseName: g.course.name })));
     files.forEach((f, i) => { f._idx = start + i; });
     groups.push({ ...g, files, source: g.source });
   });
@@ -162,7 +211,7 @@ export async function render(state, root) {
   }
 
   list.innerHTML = `
-    <p class="small muted mb">${total} file${total === 1 ? "" : "s"} · newest first · click a file to open it${fromModules ? ` · ${fromModules} from Modules` : ""}</p>
+    <p class="small muted mb">${total} file${total === 1 ? "" : "s"} · newest first · click a file to preview it${fromModules ? ` · ${fromModules} from Modules` : ""}</p>
     ${groups.map((g) => `
       <div class="card">
         <div class="flex between" style="margin-bottom:6px">

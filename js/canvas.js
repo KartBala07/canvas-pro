@@ -108,6 +108,10 @@ export function getCourseFiles(courseId) {
   return all(`/api/v1/courses/${courseId}/files?sort=updated_at&order=desc`);
 }
 
+export function fileDownloadUrl(base, courseId, fileId) {
+  return `${base.replace(/\/$/, "")}/api/v1/courses/${courseId}/files/${fileId}/download?download_frd=1`;
+}
+
 export function getAnnouncements(contextCodes, cutoffDays = 60) {
   const start = new Date(Date.now() - cutoffDays * 864e5).toISOString();
   return all(`/api/v1/announcements?${contextCodes.map((c) => "context_codes[]=" + encodeURIComponent(c)).join("&")}&start_date=${encodeURIComponent(start)}`);
