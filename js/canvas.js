@@ -108,6 +108,42 @@ export function getCourseFiles(courseId) {
   return all(`/api/v1/courses/${courseId}/files?sort=updated_at&order=desc`);
 }
 
+// Handouts are often posted as Modules ("File") items instead of Files.
+// Module items usually stay readable for students even when the Files API
+// is scope-locked, so this is the Documents fallback.
+export async function getModuleFiles(courseId) {
+  const modules = await all(`/api/v1/courses/${courseId}/modules?include[]=items&include[]=content_details`);
+  const items = [];
+  for (const m of modules) {
+    for (const it of m.items || []) {
+      if (it && it.type === "File") items.push({ ...it, module_id: m.id });
+    }
+  }
+  const out = [];
+  await Promise.all(items.map(async (it) => {
+    try {
+      let d = it;
+      if (!d.url || !d.content_details) {
+        d = await api(`/api/v1/courses/${courseId}/modules/${it.module_id}/items/${it.id}?include[]=content_details`);
+      }
+      const det = d.content_details || {};
+      if (d.url) {
+        out.push({
+          id: String(d.content_id || d.id),
+          display_name: d.title || it.title,
+          filename: d.title || it.title,
+          content_type: det.content_type,
+          size: det.size,
+          updated_at: det.updated_at,
+          url: d.url,
+          locked: !!det.locked,
+        });
+      }
+    } catch (e) {}
+  }));
+  return out;
+}
+
 export function getCalendarEvents(startIso, endIso) {
   return all(`/api/v1/calendar_events?type=assignment&start_date=${encodeURIComponent(startIso)}&end_date=${encodeURIComponent(endIso)}`);
 }

@@ -81,9 +81,42 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # ---- file download passthrough (token-authenticated, streams bytes) ----
+    def do_DL(self):
+        parsed = urllib.parse.urlsplit(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        u = qs.get("u", [""])[0]
+        token = self.headers.get("X-Canvas-Token", "")
+        if not u or not token:
+            self.send_error(400, "Missing u / X-Canvas-Token")
+            return
+        req = urllib.request.Request(u, headers={"Authorization": "Bearer " + token})
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+        except urllib.error.HTTPError as e:
+            body = e.read()
+            self.send_response(e.code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        except Exception as e:
+            self.send_error(502, "File proxy failed: %s" % e)
+            return
+        data = resp.read()
+        self.send_response(resp.status)
+        self.send_header("Content-Type", resp.headers.get_content_type() or "application/octet-stream")
+        self.send_header("Content-Disposition", "inline")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         if self.path.startswith("/api/canvas") or self.path.startswith("/api/canvas?"):
             return self.do_CANVAS()
+        if self.path.startswith("/api/dl?") or self.path.startswith("/api/dl"):
+            return self.do_DL()
         return super().do_GET()
 
 def pick_port():
