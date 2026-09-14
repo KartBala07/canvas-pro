@@ -11,7 +11,7 @@
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    window.__rev = "b19";
+    window.__rev = "b20";
     function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
@@ -56,6 +56,7 @@
       <nav class="sidebar">
         <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
         <button class="tab-btn" data-tab="assignments">Assignments</button>
+        <button class="tab-btn" data-tab="tests">Tests</button>
         <button class="tab-btn" data-tab="todo">To-Do</button>
         <button class="tab-btn" data-tab="grades">Grades</button>
         <button class="tab-btn" data-tab="study">Study Plan</button>

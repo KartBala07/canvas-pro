@@ -31,6 +31,7 @@ function normalizeAssignment(course, group, a) {
   const type = typeOf(a);
   return {
     id: `${course.id}-${a.id}`,
+    canvasId: a.id,
     courseId: course.id,
     courseName: course.name,
     courseCode: course.code,

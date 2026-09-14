@@ -1,35 +1,24 @@
-import { fmtDate, num, esc, daysUntil, toast } from "../utils.js";
+import { esc, toast, daysUntil } from "../utils.js";
 import { settings, saveSettings, doneIds, setDone, markAllDone, clearDone } from "../storage.js";
-
-function rowHTML(t, done) {
-  const due = daysUntil(t.dueAt);
-  const overdue = due != null && due < 0;
-  return `
-    <tr class="${done.has(t.id) ? "done" : ""}">
-      <td style="width:36px"><input type="checkbox" class="done-box" data-id="${esc(t.id)}" title="Mark done (saved on this device)" ${done.has(t.id) ? "checked" : ""} /></td>
-      <td>
-        ${t.htmlUrl ? `<a href="${esc(t.htmlUrl)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none"><b>${esc(t.title)}</b></a>` : `<b>${esc(t.title)}</b>`}
-        <div class="small muted">${esc(t.courseName || "—")}${t.groupName ? ` · ${esc(t.groupName)}` : ""}${t.groupWeight != null ? ` · ${t.groupWeight}%` : ""}${t.pointsPossible ? ` · ${t.pointsPossible} pts` : ""}</div>
-      </td>
-      <td><span class="tag ${t.type === "exam" ? "tag-red" : t.type === "quiz" ? "tag-yellow" : t.type === "project" ? "tag-purple" : "tag-blue"}">${t.type}</span></td>
-      <td class="muted">${fmtDate(t.dueAt)}${overdue ? " ⚠️" : ""}</td>
-      <td>${t.pointsEarned != null ? `${num(t.pointsEarned)} / ${num(t.pointsPossible)}` : t.submitted ? "Submitted" : `<span class="tag tag-yellow">Open</span>`}</td>
-    </tr>`;
-}
+import { rowHTML } from "./_rows.js";
+import { openTask } from "./taskdetail.js";
 
 function byDue(a, b) {
   return (a.dueAt || "9999")?.localeCompare(b.dueAt || "9999") || (a.title || "").localeCompare(b.title || "");
 }
 
 export function render(state, root) {
-  const { courses, tasks } = state.data;
+  const { courses, tasks, todos } = state.data;
   let done = new Set(doneIds());
+  const all = [...tasks, ...todos.filter((t) => !tasks.some((x) => x.id === t.id))];
+  const isTest = (t) => t.type === "exam" || t.type === "quiz";
+  const work = all.filter((t) => !isTest(t));
 
   root.innerHTML = `
     <h1>Assignments</h1>
-    <p class="subtitle">Every assignment across your classes, with due dates, weights, and your own personal "done" checkmarks.</p>
+    <p class="subtitle">Homework, essays &amp; projects — tests &amp; quizzes live on the <b>Tests</b> tab. Click any title to open it right here.</p>
     <div class="flex mt">
-      <input id="asgSearch" class="search" placeholder="Search assignments…" style="padding:9px 13px;border-radius:10px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text);flex:1;max-width:300px" />
+      <input id="asgSearch" class="search" placeholder="Search…" style="padding:9px 13px;border-radius:10px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text);flex:1;max-width:300px" />
       <label class="flex small muted" style="white-space:nowrap">
         <input type="checkbox" id="asgHideDone" ${settings().filterSubmitted ? "checked" : ""} /> Hide submitted
       </label>
@@ -52,9 +41,9 @@ export function render(state, root) {
       return true;
     };
     const isLate = (t) => t.dueAt && (daysUntil(t.dueAt) ?? 1) < 0 && !t.submitted && !done.has(t.id);
-    const lateSet = new Set(tasks.filter(isLate).map((t) => t.id));
+    const lateSet = new Set(work.filter(isLate).map((t) => t.id));
 
-    const lateItems = tasks.filter((t) => lateSet.has(t.id) && passes(t)).sort(byDue);
+    const lateItems = work.filter((t) => lateSet.has(t.id) && passes(t)).sort(byDue);
     const lateHTML = lateItems.length
       ? `<div class="card mt card-late">
           <div class="flex between">
@@ -70,7 +59,7 @@ export function render(state, root) {
 
     let courseHTML = "";
     for (const c of courses) {
-      const items = tasks.filter((t) => t.courseId === c.id && !lateSet.has(t.id)).sort(byDue);
+      const items = work.filter((t) => t.courseId === c.id && !lateSet.has(t.id)).sort(byDue);
       const shown = items.filter(passes);
       if (!shown.length) continue;
       courseHTML += `
@@ -103,8 +92,23 @@ export function render(state, root) {
     draw();
   });
 
+  list.addEventListener("click", (e) => {
+    const open = e.target.closest(".task-open");
+    if (open) {
+      const task = all.find((t) => t.id === open.dataset.id);
+      if (task) openTask(task, state);
+      return;
+    }
+    const clear = e.target.closest("#asgClearDone");
+    if (clear) {
+      clearDone();
+      done = new Set();
+      draw();
+    }
+  });
+
   root.querySelector("#asgMarkAll").addEventListener("click", () => {
-    const openIds = tasks.filter((t) => !t.submitted && !done.has(t.id)).map((t) => t.id);
+    const openIds = work.filter((t) => !t.submitted && !done.has(t.id)).map((t) => t.id);
     if (openIds.length) {
       done = new Set(markAllDone(openIds));
       toast(`${openIds.length} marked done.`, "ok");
@@ -112,12 +116,6 @@ export function render(state, root) {
     } else {
       toast("Nothing open left to mark.", "");
     }
-  });
-
-  root.querySelector("#asgClearDone")?.addEventListener("click", () => {
-    clearDone();
-    done = new Set();
-    draw();
   });
 
   draw();

@@ -1,13 +1,14 @@
 import { fmtDate, esc } from "../utils.js";
 import { recommendedOrder, bandClass } from "../priorities.js";
 import { settings, saveSettings, doneIds, setDone, clearDone } from "../storage.js";
+import { openTask } from "./taskdetail.js";
 
 function activeRowHTML({ task, course, score, band, reasons }, done) {
   return `
     <tr class="${done.has(task.id) ? "done" : ""}" data-id="${esc(task.id)}">
       <td style="width:36px"><input type="checkbox" class="todo-done" data-id="${esc(task.id)}" ${done.has(task.id) ? "checked" : ""} title="Mark done" /></td>
       <td>
-        <div>${task.htmlUrl ? `<a href="${esc(task.htmlUrl)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none"><b>${esc(task.title)}</b></a>` : `<b>${esc(task.title)}</b>`}
+        <div>${task.htmlUrl ? `<button class="task-open link-btn" data-id="${esc(task.id)}"><b>${esc(task.title)}</b></button>` : `<b>${esc(task.title)}</b>`}
           <span class="tag ${bandClass(band)?.split(" ")[0]}">${band}</span> <span class="tag ${task.type === "exam" ? "tag-red" : "tag-blue"}">${task.type}</span></div>
         <div class="small muted">${esc(task.courseName || "")} · due ${fmtDate(task.dueAt)}</div>
       </td>
@@ -114,6 +115,12 @@ export function render(state, root) {
   });
 
   list.addEventListener("click", (e) => {
+    const open = e.target.closest(".task-open");
+    if (open) {
+      const t = merged.find((x) => x.id === open.dataset.id);
+      if (t) openTask(t, state);
+      return;
+    }
     const btn = e.target.closest("#todoClearDone");
     if (!btn) return;
     clearDone();

@@ -14,6 +14,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 import { render as renderDashboard } from "./ui/dashboard.js";
 import { render as renderAssignments } from "./ui/assignments.js";
+import { render as renderTests } from "./ui/tests.js";
 import { render as renderTodo } from "./ui/todo.js";
 import { render as renderGrades } from "./ui/grades.js";
 import { render as renderStudy } from "./ui/study.js";
@@ -23,6 +24,7 @@ import { render as renderSettings } from "./ui/settings.js";
 const VIEWS = {
   dashboard: renderDashboard,
   assignments: renderAssignments,
+  tests: renderTests,
   todo: renderTodo,
   grades: renderGrades,
   study: renderStudy,

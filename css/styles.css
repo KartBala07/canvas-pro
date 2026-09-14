@@ -295,3 +295,50 @@ tr.done td:first-child { text-decoration: none; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .main { padding: 18px 14px 40px; }
 }
+/* ---------- Task detail modal ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(10, 12, 24, .78);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: min(680px, 96vw);
+  max-height: 86vh;
+  overflow: auto;
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.modal-head h2 { font-size: 19px; line-height: 1.3; }
+.meta { display: flex; flex-direction: column; gap: 3px; }
+.status-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.desc {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 14px; line-height: 1.55;
+  color: var(--text);
+}
+.desc img { max-width: 100%; border-radius: 8px; }
+.desc a { color: var(--accent); }
+.desc table { width: 100%; border-collapse: collapse; }
+.desc table, .desc td, .desc th { border: 1px solid var(--border); }
+.desc td, .desc th { padding: 6px 8px; }
+.modal-foot { display: flex; justify-content: flex-end; }
+.modal-foot .btn { padding: 9px 16px; border-radius: 10px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
+.modal-foot .btn:hover { background: var(--accent-2); }
+
+.link-btn {
+  background: transparent; border: none; padding: 0;
+  color: var(--text); font: inherit; text-align: left;
+  cursor: pointer; text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.link-btn:hover { color: var(--accent); }
