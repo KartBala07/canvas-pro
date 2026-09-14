@@ -1,11 +1,12 @@
 import { esc } from "../utils.js";
 import { generateSchedule, scheduleSummary } from "../schedule.js";
-import { settings, saveSettings } from "../storage.js";
+import { settings, saveSettings, doneIds } from "../storage.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data;
+  const done = new Set(doneIds());
   const merged = [...tasks, ...todos.filter((t) => !tasks.some((x) => x.id === t.id))];
-  const open = merged.filter((t) => !t.submitted && t.dueAt);
+  const open = merged.filter((t) => !t.submitted && !done.has(t.id) && t.dueAt);
   const s = settings();
 
   const sched = generateSchedule(courses, open);
