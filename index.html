@@ -5,6 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Canvas Pro</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    // Fail-safe: the module app hides both screens until it boots. If it
+    // doesn't boot, surface the connect screen + an explanation instead of
+    // leaving an empty page.
+    window.__booted = false;
+    function showBootError(msg) {
+      if (window.__booted) return;
+      var o = document.getElementById('onboarding');
+      var err = document.getElementById('bootError');
+      if (o) o.classList.remove('hidden');
+      if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+    }
+    window.addEventListener('error', function (e) {
+      showBootError('App failed to start: ' + (e.message || 'unknown error (check DevTools console)'));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      showBootError('App failed to start: ' + (e.reason && e.reason.message ? e.reason.message : 'unknown error (check DevTools console)'));
+    });
+    setTimeout(function () {
+      if (location.protocol === 'file:') {
+        showBootError('You opened index.html directly from disk. ES modules need a server. In the canvas-pro folder run:  npm start   then open  http://localhost:8000');
+      } else if (!window.__booted) {
+        showBootError('The app did not start. Reload the page, or check the DevTools console (Cmd+Option+J).');
+      }
+    }, 2500);
+  </script>
 </head>
 <body>
   <div id="app" class="app hidden">
@@ -58,6 +84,7 @@
       </label>
 
       <p class="hint error hidden" id="onboardingError"></p>
+      <p class="hint error hidden" id="bootError"></p>
 
       <button id="onConnect" class="btn btn-primary btn-block">Connect to Canvas</button>
     </div>

@@ -3,6 +3,8 @@ import * as canvas from "./canvas.js";
 import { settings, saveSettings, cacheData, saveData, emailAllowed, cloudReady } from "./storage.js";
 import * as data from "./data.js";
 
+window.__booted = true;
+
 import { render as renderDashboard } from "./ui/dashboard.js";
 import { render as renderAssignments } from "./ui/assignments.js";
 import { render as renderTodo } from "./ui/todo.js";
