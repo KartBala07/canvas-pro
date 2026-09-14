@@ -35,23 +35,44 @@ export function render(state, root) {
     const term = q.value.toLowerCase();
     const passes = (t) => !term || `${t.title} ${t.courseName}`.toLowerCase().includes(term);
 
+    const HEAD = `<thead><tr><th></th><th>Test</th><th>Type</th><th>Due</th><th>Study time</th></tr></thead>`;
+
     let courseHTML = "";
     for (const c of courses) {
-      const items = tests.filter((t) => t.courseId === c.id).sort(byDue);
-      const shown = items.filter(passes);
-      if (!shown.length) continue;
-      const prep = shown.filter((t) => !done.has(t.id) && !t.submitted).reduce((a, t) => a + (t.baseMinutes || 0), 0);
-      const urgent = shown.filter((t) => (daysUntil(t.dueAt) ?? 99) <= 3 && !done.has(t.id) && !t.submitted).length;
+      const inCourse = tests.filter((t) => t.courseId === c.id).sort(byDue);
+      const active = inCourse.filter((t) => !t.submitted && !done.has(t.id));
+      const completed = inCourse.filter((t) => t.submitted || done.has(t.id));
+      const activeShown = active.filter(passes);
+      const completedShown = completed.filter(passes);
+      if (!activeShown.length && !completedShown.length) continue;
+
+      const displayDone = new Set(done);
+      for (const t of completed) if (t.submitted) displayDone.add(t.id);
+
+      const prep = activeShown.reduce((a, t) => a + (t.baseMinutes || 0), 0);
+      const urgent = activeShown.filter((t) => (daysUntil(t.dueAt) ?? 99) <= 3).length;
+
+      const doneFold = completedShown.length
+        ? `<details class="done-collapse"${term ? " open" : ""}>
+            <summary>Completed ✓ · ${completed.length}</summary>
+            <div class="table-wrap"><table>
+              ${HEAD}
+              <tbody>${completedShown.map((t) => rowHTML(t, displayDone, { withMinutes: true })).join("")}</tbody>
+            </table></div>
+          </details>`
+        : "";
+
       courseHTML += `
         <div class="card mt">
           <div class="flex between">
             <h3>${esc(c.name)}</h3>
-            <div class="small muted">${urgent ? `${urgent} with 3d ⚠️ · ` : ""}${prep ? `${Math.round(prep / 30)}⅓ h` : ""}</div>
+            <div class="small muted">${urgent ? `${urgent} with 3d ⚠️ · ` : ""}${prep ? `${Math.round(prep / 30)}⅓ h` : ""} · ${completed.length} done</div>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th></th><th>Test</th><th>Type</th><th>Due</th><th>Study time</th></tr></thead>
-            <tbody>${shown.map((t) => rowHTML(t, done, { withMinutes: true })).join("")}</tbody>
+            ${HEAD}
+            <tbody>${activeShown.map((t) => rowHTML(t, done, { withMinutes: true })).join("")}</tbody>
           </table></div>
+          ${doneFold}
         </div>`;
     }
 

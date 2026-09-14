@@ -32,6 +32,8 @@ export function render(state, root) {
   const hide = root.querySelector("#asgHideDone");
   const list = root.querySelector("#asgList");
 
+  const HEAD = `<thead><tr><th></th><th>Assignment</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>`;
+
   function draw() {
     const term = q.value.toLowerCase();
 
@@ -51,7 +53,7 @@ export function render(state, root) {
             <span class="small muted">overdue & not submitted</span>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th></th><th>Assignment</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>
+            ${HEAD}
             <tbody>${lateItems.map((t) => rowHTML(t, done)).join("")}</tbody>
           </table></div>
         </div>`
@@ -59,19 +61,37 @@ export function render(state, root) {
 
     let courseHTML = "";
     for (const c of courses) {
-      const items = work.filter((t) => t.courseId === c.id && !lateSet.has(t.id)).sort(byDue);
-      const shown = items.filter(passes);
-      if (!shown.length) continue;
+      const inCourse = work.filter((t) => t.courseId === c.id && !lateSet.has(t.id)).sort(byDue);
+      const active = inCourse.filter((t) => !t.submitted && !done.has(t.id));
+      const completed = inCourse.filter((t) => t.submitted || done.has(t.id));
+      const activeShown = active.filter(passes);
+      const completedShown = completed.filter(passes);
+      if (!activeShown.length && !completedShown.length) continue;
+
+      const displayDone = new Set(done);
+      for (const t of completed) if (t.submitted) displayDone.add(t.id);
+
+      const doneFold = completedShown.length
+        ? `<details class="done-collapse"${term ? " open" : ""}>
+            <summary>Completed ✓ · ${completed.length}</summary>
+            <div class="table-wrap"><table>
+              ${HEAD}
+              <tbody>${completedShown.map((t) => rowHTML(t, displayDone)).join("")}</tbody>
+            </table></div>
+          </details>`
+        : "";
+
       courseHTML += `
         <div class="card mt">
           <div class="flex between">
             <h3>${esc(c.name)}</h3>
-            <div class="small muted">${shown.length} ${done.size ? `· ${shown.filter((t) => done.has(t.id)).length} done` : ""}</div>
+            <div class="small muted">${activeShown.length} open · ${completed.length} done</div>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th></th><th>Assignment</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>
-            <tbody>${shown.map((t) => rowHTML(t, done)).join("")}</tbody>
+            ${HEAD}
+            <tbody>${activeShown.map((t) => rowHTML(t, done)).join("")}</tbody>
           </table></div>
+          ${doneFold}
         </div>`;
     }
 
