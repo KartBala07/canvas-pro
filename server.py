@@ -159,7 +159,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req = urllib.request.Request(url, data=body, method="POST", headers=headers)
         try:
             resp = urllib.request.urlopen(req, timeout=240)
-        except HTTPError as e:
+        except urllib.error.HTTPError as e:
             err = e.read()[:2000]
             self.send_response(e.code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
