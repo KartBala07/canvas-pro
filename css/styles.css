@@ -333,6 +333,7 @@ h2 { font-size: 17px; margin-bottom: 12px; }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
+.mb { margin-bottom: 10px; }
 .gap { gap: 16px; }
 .mt { margin-top: 16px; }
 .flex { display: flex; align-items: center; gap: 10px; }
@@ -618,6 +619,12 @@ tr.done td:first-child { text-decoration: none; }
   transition: color .15s;
 }
 .link-btn:hover { color: var(--accent); }
+
+/* ---------- Documents ---------- */
+.doc-name { color: var(--text); font-weight: 600; text-decoration: none; }
+.doc-name:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.doc-open a { white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
 
 .done-collapse { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
 .done-collapse summary {

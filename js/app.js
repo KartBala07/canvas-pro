@@ -20,6 +20,7 @@ import { render as renderGrades } from "./ui/grades.js";
 import { render as renderStudy } from "./ui/study.js";
 import { render as renderCurve } from "./ui/curveview.js";
 import { render as renderSettings } from "./ui/settings.js";
+import { render as renderDocuments } from "./ui/documents.js";
 
 const VIEWS = {
   dashboard: renderDashboard,
@@ -30,6 +31,7 @@ const VIEWS = {
   study: renderStudy,
   curve: renderCurve,
   settings: renderSettings,
+  documents: renderDocuments,
 };
 
 const state = { data: cacheData(), profile: null, isLoggedIn: false };

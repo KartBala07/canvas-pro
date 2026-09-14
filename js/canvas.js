@@ -104,6 +104,10 @@ export function getAssignment(courseId, assignmentId) {
   return api(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
 }
 
+export function getCourseFiles(courseId) {
+  return all(`/api/v1/courses/${courseId}/files?sort=updated_at&order=desc`);
+}
+
 export function getCalendarEvents(startIso, endIso) {
   return all(`/api/v1/calendar_events?type=assignment&start_date=${encodeURIComponent(startIso)}&end_date=${encodeURIComponent(endIso)}`);
 }
