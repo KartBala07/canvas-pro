@@ -246,6 +246,7 @@ async function init() {
   if (s.token && s.canvasBaseUrl) {
     state.profile = s.profile;
     state.isLoggedIn = true;
+    canvas.client(s.canvasBaseUrl, s.token);
 
     if (cached && cached.courses) {
       state.data = cached;

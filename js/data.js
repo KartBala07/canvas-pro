@@ -55,14 +55,16 @@ function normalizeAssignment(course, group, a) {
 function normalizeCourse(c) {
   const enr = (c.enrollments || []).find((e) => /student/i.test(e.type));
   const grades = enr?.grades || {};
-  const current = enr?.computed_current_score ?? grades.current_score ?? enr?.computed_final_score ?? null;
+  const rawScore = enr?.computed_current_score ?? grades.current_score ?? enr?.computed_final_score ?? null;
+  const currentLetter = enr?.computed_current_grade ?? grades.current_grade ?? null;
+  const hasGrade = rawScore != null && !(rawScore === 0 && !currentLetter);
   const type = courseTypeFor(c);
   const targetGrade = settings().targets[type] ?? settings().targets.regular;
   return {
     id: c.id,
     name: c.name,
     code: c.code || c.course_code || null,
-    currentScore: current,
+    currentScore: hasGrade ? rawScore : null,
     currentGrade: enr?.computed_current_grade ?? grades.current_grade ?? null,
     finalScore: enr?.computed_final_score ?? null,
     finalGrade: enr?.computed_final_grade ?? null,

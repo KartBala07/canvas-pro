@@ -63,6 +63,32 @@ export function cacheSet(key, value) {
   localStorage.setItem(PREFIX + key, JSON.stringify(value));
 }
 
+// ---------- "I did this" checkmarks (local only, this device) ----------
+const DONE_KEY = PREFIX + "doneIds";
+
+export function doneIds() {
+  try { return JSON.parse(localStorage.getItem(DONE_KEY) || "[]"); }
+  catch { return []; }
+}
+
+export function setDone(id, done) {
+  const set = new Set(doneIds());
+  if (done) set.add(id); else set.delete(id);
+  localStorage.setItem(DONE_KEY, JSON.stringify([...set]));
+  return [...set];
+}
+
+export function markAllDone(ids) {
+  const set = new Set(doneIds());
+  for (const id of ids) set.add(id);
+  localStorage.setItem(DONE_KEY, JSON.stringify([...set]));
+  return [...set];
+}
+
+export function clearDone() {
+  localStorage.setItem(DONE_KEY, "[]");
+}
+
 // ---------- Supabase ----------
 const EMAIL_RE = /^[^@]+@([^@]+)$/;
 
