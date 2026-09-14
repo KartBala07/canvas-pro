@@ -152,6 +152,7 @@ function bindEvents() {
 function bindOnboarding() {
   const btn = $("#onConnect");
   const err = $("#onboardingError");
+  const note = $("#serverNote");
   btn.addEventListener("click", async () => {
     const url = $("#onCanvasUrl").value.trim();
     const token = $("#onToken").value.trim();
@@ -167,25 +168,55 @@ function bindOnboarding() {
     s.canvasBaseUrl = url;
     s.token = token;
     saveSettings();
-    try {
-      const ok = await connectAndLoad();
-      if (!ok) {
-        err.textContent = lastConnectError || "Connection failed.";
-        err.classList.remove("hidden");
-      }
-    } catch (e) {
-      err.textContent = e.message || "Connection failed.";
+
+    const fail = (msg) => {
+      err.textContent = msg;
       err.classList.remove("hidden");
-    } finally {
       btn.disabled = false;
       btn.textContent = "Connect to Canvas";
+    };
+
+    try {
+      if (!(await probeL.serverAlive())) {
+        fail("The local server is not responding. Keep the npm start terminal open — it is required as the Canvas proxy. Then hit connect again.");
+        return;
+      }
+      note.textContent = "Server OK ✓ — contacting Canvas…";
+      const ok = await connectAndLoad();
+      if (!ok) fail(lastConnectError || "Connection failed.");
+    } catch (e) {
+      fail((e && e.message) || "Connection failed. Check DevTools console (Cmd+Option+J).");
+      console.error(e);
     }
   });
+}
+
+const probeL = {
+  async serverAlive() {
+    try {
+      const r = await fetch("/version.json?probe=" + Date.now(), { cache: "no-store" });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+async function serverStatusOnBoot() {
+  const note = $("#serverNote");
+  if (!note) return;
+  const alive = await probeL.serverAlive();
+  note.textContent = alive
+    ? "Local server: detected ✓ (npm start is running)"
+    : "Local server: NOT responding ✗ — run  npm start  in ~/canvas-pro and keep it open.";
+  note.style.color = alive ? "" : "var(--red)";
 }
 
 async function init() {
   setBadge();
   bindEvents();
+  serverStatusOnBoot();
+  bindOnboarding();
   const s = settings();
   const cached = cacheData();
 

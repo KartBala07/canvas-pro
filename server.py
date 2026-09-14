@@ -24,10 +24,18 @@ def rewrite_pagelink(value, host):
     return ", ".join(parts)
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    server_version = "CanvasPro/0.1"
+    server_version = "CanvasPro/0.2"
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=PROJECT_DIR, **kw)
+
+    def end_headers(self):
+        # Dev server: never cache, so updated JS always loads without hard refreshes.
+        try:
+            self.send_header("Cache-Control", "no-store")
+        except Exception:
+            pass
+        super().end_headers()
 
     def log_message(self, fmt, *args):
         msg = fmt % args
