@@ -1,4 +1,4 @@
-import os, sys, socketserver, threading, webbrowser, json
+import os, sys, socketserver, threading, webbrowser, json, traceback
 import urllib.request, urllib.parse
 
 import http.server
@@ -145,6 +145,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().do_DELETE()
 
     def do_AI(self):
+        try:
+            self._do_AI()
+        except Exception as e:
+            # Never let an AI call crash the handler (that drops the connection
+            # and browsers report "Failed to fetch"). Always reply with JSON.
+            print("AI route error:", traceback.format_exc())
+            self.send_error(500, "AI proxy internal error")
+        finally:
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+
+    def _do_AI(self):
         body = self._read_body()
         url = self.headers.get("X-AI-Url", "").strip()
         if not url:
@@ -171,7 +185,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_error(502, "AI upstream error: " + str(e)[:200])
         data = resp.read()
         self.send_response(resp.getcode() or 200)
-        ctype = resp.headers.get("Content-Type") or "application/json; charset=utf-8"
+        ctype = (resp.headers.get("Content-Type") or "application/json; charset=utf-8").split(";")[0]
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()

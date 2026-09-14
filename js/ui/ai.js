@@ -100,8 +100,12 @@ export function render(state, root) {
       if (!content) throw new Error("No reply content in response");
       addMsg("bot", content);
     } catch (err) {
-      addMsg("bot", "⚠️ " + (err.message || String(err)));
-      toast("AI request failed: " + (err.message || err), "err");
+      const nf = (err instanceof TypeError && /failed to fetch/i.test(err.message)) || /networkerror/i.test(err.message || "");
+      const msg = nf
+        ? "⚠️ Couldn't reach the local server (\"Failed to fetch\"). This is not an API-key problem — make sure the server has been restarted with the latest code: stop it with Ctrl+C, then run `npm start` again, and reload this page."
+        : "⚠️ " + (err.message || String(err));
+      addMsg("bot", msg);
+      if (nf) toast("No response from local server — restart it (Ctrl+C, then npm start).", "err");
     }
   }
 }
