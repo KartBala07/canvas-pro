@@ -1,4 +1,4 @@
-import { $, toast, esc } from "./utils.js";
+import { $, $$, toast, esc } from "./utils.js";
 import * as canvas from "./canvas.js";
 import { settings, saveSettings, cacheData, saveData, emailAllowed, cloudReady } from "./storage.js";
 import * as data from "./data.js";
