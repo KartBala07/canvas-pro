@@ -1,4 +1,4 @@
-import os, sys, socketserver, threading, webbrowser, json, traceback
+import os, sys, time, subprocess, socketserver, threading, webbrowser, json, traceback
 import urllib.request, urllib.parse
 
 import http.server
@@ -6,6 +6,35 @@ import http.server
 PORT_START = 8000
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(PROJECT_DIR)
+
+# The owner requires this app to always run the beta branch. The server serves
+# straight from the checkout, so refuse to start on any other branch and warn
+# loudly if the branch is switched while the server is up.
+ALLOWED_BRANCH = "beta"
+
+def git_branch():
+    """Current git branch name, or None if not a git checkout."""
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", PROJECT_DIR, "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL, timeout=5, text=True,
+        )
+        return out.strip() or None
+    except Exception:
+        return None
+
+def check_branch_ok(fail_hard=True):
+    branch = git_branch()
+    if branch is None:
+        print("Warning: %s is not a git checkout — cannot enforce the %r branch." % (PROJECT_DIR, ALLOWED_BRANCH))
+        return None
+    if branch == ALLOWED_BRANCH:
+        return branch
+    if fail_hard:
+        print("Refusing to start: checked out on %r, but this app must run the %r branch." % (branch, ALLOWED_BRANCH))
+        print("Fix it:  cd ~/canvas-pro && git checkout %s && npm start" % ALLOWED_BRANCH)
+        sys.exit(3)
+    return branch
 
 def rewrite_pagelink(value, host):
     """Rewrite Canvas pagination Link header to point back at this proxy."""
@@ -265,6 +294,9 @@ def pick_port():
     return None
 
 def main():
+    branch = check_branch_ok(fail_hard=True)
+    print("Serving branch: %s" % branch, flush=True)
+
     port = pick_port()
     if port is None:
         print("No free port found in 8000-8019. Close something and retry.")
@@ -279,6 +311,16 @@ def main():
     print(f"\nCanvas Pro is running at  {url}", flush=True)
     print("Keep this window open. Press Ctrl+C to stop.\n", flush=True)
 
+    def watchdog():
+        # Branch paths mid-run: the site serves whatever the checkout has, so
+        # shout if it ever stops being beta.
+        while True:
+            time.sleep(5)
+            b = check_branch_ok(fail_hard=False)
+            if b is not None and b != ALLOWED_BRANCH:
+                print("\n!!! Git checkout changed to %r — this site is now serving NON-BETA code. Run  git checkout %s  to fix it.\n" % (b, ALLOWED_BRANCH), flush=True)
+
+    threading.Thread(target=watchdog, daemon=True).start()
     threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:
         httpd.serve_forever()

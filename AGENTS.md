@@ -14,6 +14,9 @@ Vanilla ES modules, no build step, no framework. Runs on the user's machine:
   says to. `main` is the "I'm happy with this" stable snapshot.
 - Keep `origin/beta` and `origin/main` up to date after commits when a remote
   is configured (push only the branch you committed to).
+- **`server.py` enforces this**: it refuses to start unless the checkout is on
+  `beta`, and shouts in the server log if the branch is switched mid-run
+  (the site would otherwise silently serve whatever branch is checked out).
 
 ## Release / versioning convention
 
