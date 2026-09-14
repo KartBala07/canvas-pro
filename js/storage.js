@@ -18,6 +18,7 @@ export const DEFAULT_JSON = {
   courseTypes: {},                     // courseId => "ap" | "honors" | "regular"
   filterSubmitted: true,
   todoHideDone: false,
+  theme: "midnight",
   lastSync: null,
 };
 

@@ -23,6 +23,23 @@ export function render(state, root) {
     <h1>Settings</h1>
 
     <div class="card">
+      <h2>Appearance</h2>
+      <p class="small muted">Three moods — applies instantly, saved on this device. Animations, round corners and checkmarks theme along with it.</p>
+      <div class="theme-row mt">
+        ${[
+          { id: "midnight", name: "Midnight", desc: "Cool blue night", sw: "sw-midnight" },
+          { id: "earthy", name: "Earthy", desc: "Warm, natural tones", sw: "sw-earthy" },
+          { id: "cream", name: "Cream", desc: "Soft light cream", sw: "sw-cream" },
+        ].map((t) => `
+          <button class="theme-swatch ${s.theme === t.id ? "active" : ""}" data-theme="${t.id}">
+            <div class="sw ${t.sw}"></div>
+            <div class="name">${t.name}</div>
+            <div class="desc">${t.desc}</div>
+          </button>`).join("")}
+      </div>
+    </div>
+
+    <div class="card mt">
       <h2>Canvas connection</h2>
       ${p ? `<div class="flex between">
         <div><b>${esc(p.name)}</b><div class="small muted">${esc(p.email)} · user #${esc(p.id)}</div></div>
@@ -79,6 +96,17 @@ export function render(state, root) {
   `;
 
   const save = () => saveSettings();
+
+  root.querySelectorAll(".theme-swatch").forEach((b) => {
+    b.addEventListener("click", () => {
+      const t = b.dataset.theme;
+      root.querySelectorAll(".theme-swatch").forEach((x) => x.classList.toggle("active", x === b));
+      s.theme = t;
+      save();
+      document.documentElement.setAttribute("data-theme", t);
+      toast(`Theme saved: ${t}.`);
+    });
+  });
 
   root.querySelector("#reconnect")?.addEventListener("click", () => {
     localStorage.removeItem("cp:settings");

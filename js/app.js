@@ -67,6 +67,9 @@ function showApp() {
 async function renderTab(tab) {
   const root = $("#mainContent");
   try {
+    root.classList.remove("tab-anim");
+    void root.offsetWidth;
+    root.classList.add("tab-anim");
     setLoading(true, "Rendering…");
     const fn = VIEWS[tab] || renderDashboard;
     await fn(state, root);
