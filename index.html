@@ -11,18 +11,22 @@
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    function showBootError(msg) {
+    window.__rev = "fb15403";
+    function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
       if (o) o.classList.remove('hidden');
-      if (err) { err.textContent = msg; err.classList.remove('hidden'); }
-      var banner = document.createElement('div');
+      if (err) {
+        var trace = (stack || '').split('\n').slice(0, 2).join('  ⤷  ');
+        err.textContent = msg + (trace ? '  [at: ' + trace + ']' : '') + '  (rev ' + window.__rev + ')';
+        err.classList.remove('hidden');
+      }
     }
     window.addEventListener('error', function (e) {
-      showBootError('JS ERROR: ' + (e.message || 'unknown (see DevTools console: Cmd+Option+J)'));
+      showBootError('JS ERROR: ' + (e.message || 'unknown (see DevTools console: Cmd+Option+J)'), e.error && e.error.stack);
     });
     window.addEventListener('unhandledrejection', function (e) {
-      showBootError('JS ERROR: ' + (e.reason && e.reason.message ? e.reason.message : 'unknown (see DevTools console: Cmd+Option+J)'));
+      showBootError('JS ERROR: ' + (e.reason && e.reason.message ? e.reason.message : 'unknown (see DevTools console: Cmd+Option+J)'), e.reason && e.reason.stack);
     });
     setTimeout(function () {
       if (location.protocol === 'file:') {
