@@ -11,7 +11,7 @@
     // leaving an empty page. ANY error is shown (no suppression) so the user
     // can report exactly what happened.
     window.__booted = false;
-    window.__rev = "b15";
+    window.__rev = "b16";
     function showBootError(msg, stack) {
       var o = document.getElementById('onboarding');
       var err = document.getElementById('bootError');
@@ -63,13 +63,13 @@
         <button class="tab-btn" data-tab="settings">Settings</button>
       </nav>
 
-      <main id="mainContent" class="main">
-        <div class="loading" id="globalLoading">
-          <div class="spinner"></div>
-          <p id="loadingText">Loading…</p>
-        </div>
-      </main>
+      <main id="mainContent" class="main"></main>
     </div>
+  </div>
+
+  <div class="loading overlay hidden" id="globalLoading">
+    <div class="spinner"></div>
+    <p id="loadingText">Loading…</p>
   </div>
 
   <div id="onboarding" class="onboarding">

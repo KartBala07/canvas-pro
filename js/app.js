@@ -64,12 +64,12 @@ function showApp() {
 
 async function renderTab(tab) {
   const root = $("#mainContent");
-  setLoading(true, "Rendering…");
   try {
+    setLoading(true, "Rendering…");
     const fn = VIEWS[tab] || renderDashboard;
     await fn(state, root);
   } catch (e) {
-    root.innerHTML = `<div class="card"><h2>Something broke</h2><p class="error">${esc(e.message)}</p></div>`;
+    root.innerHTML = `<div class="card"><h2>Something broke</h2><p class="error">${esc(e.message)}</p><p class="hint error">at: ${esc(e.stack || "").split("\n").slice(0, 3).join(" ⮑ ")}</p></div>`;
     console.error(e);
   } finally {
     setLoading(false);
