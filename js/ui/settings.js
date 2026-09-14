@@ -60,6 +60,7 @@ export function render(state, root) {
       <p class="small muted">Powered the AI tab. Your key is stored locally and only ever sent to the provider endpoint you choose. GitHub Copilot works best with a GitHub token from an account that has Copilot.</p>
       <div class="field"><span>Provider</span>
         <select id="aiProvider">
+          <option value="gemini" ${s.aiProvider === "gemini" ? "selected" : ""}>Google Gemini (API key)</option>
           <option value="openai" ${s.aiProvider === "openai" ? "selected" : ""}>OpenAI-compatible (OpenAI, Azure, Together, LocalAI, Groq…)</option>
           <option value="copilot" ${s.aiProvider === "copilot" ? "selected" : ""}>GitHub Copilot</option>
         </select>
@@ -155,10 +156,17 @@ export function render(state, root) {
   root.querySelector("#setBlockMail")?.addEventListener("change", (e) => { s.blockPersonalEmails = e.target.checked; save(); });
 
   const AI_HINTS = {
+    gemini: "Google Gemini: uses Google's OpenAI-compatible endpoint. Get a free API key at Google AI Studio (aistudio.google.com) and paste it below.",
     openai: "OpenAI-compatible: works with OpenAI, Azure OpenAI, Groq, Together, LocalAI… Endpoint points at /v1/chat/completions.",
     copilot: "GitHub Copilot: uses api.githubcopilot.com. Needs a token from a GitHub account with an active Copilot subscription. Unofficial endpoint; may change.",
   };
-  const AI_URLS = { openai: "https://api.openai.com/v1/chat/completions", copilot: "https://api.githubcopilot.com/chat/completions" };
+  const AI_URLS = {
+    gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    openai: "https://api.openai.com/v1/chat/completions",
+    copilot: "https://api.githubcopilot.com/chat/completions",
+  };
+  const AI_MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4o", copilot: "gpt-4o" };
+  const KNOWN_DEFAULTS = Object.values(AI_MODELS);
   const setAiHint = () => {
     const sel = root.querySelector("#aiProvider");
     const hint = root.querySelector("#aiHint");
@@ -166,8 +174,11 @@ export function render(state, root) {
   };
   setAiHint();
   root.querySelector("#aiProvider")?.addEventListener("change", (e) => {
+    const pv = e.target.value;
     const url = root.querySelector("#aiUrl");
-    if (url && !url.value) url.value = AI_URLS[e.target.value] || "";
+    const model = root.querySelector("#aiModel");
+    if (url && !url.value) url.value = AI_URLS[pv] || "";
+    if (model && (!model.value || KNOWN_DEFAULTS.includes(model.value))) model.value = AI_MODELS[pv] || "";
     setAiHint();
   });
   root.querySelector("#aiSaveNow")?.addEventListener("click", () => {
