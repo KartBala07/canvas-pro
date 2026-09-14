@@ -20,6 +20,11 @@ export const DEFAULT_JSON = {
   todoHideDone: false,
   theme: "midnight",
   mode: "dark",
+  syllabus: {},                // courseId (or "_all") -> { weights, latePolicy, raw }
+  aiProvider: "openai",        // "openai" | "copilot"
+  aiUrl: "",
+  aiModel: "gpt-4o",
+  aiKey: "",
   lastSync: null,
 };
 

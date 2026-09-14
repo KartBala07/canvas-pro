@@ -22,6 +22,8 @@ import { render as renderCurve } from "./ui/curveview.js";
 import { render as renderSettings } from "./ui/settings.js";
 import { render as renderDocuments } from "./ui/documents.js";
 import { render as renderAnnouncements } from "./ui/announcements.js";
+import { render as renderLate } from "./ui/latelist.js";
+import { render as renderAi } from "./ui/ai.js";
 
 const VIEWS = {
   dashboard: renderDashboard,
@@ -34,6 +36,8 @@ const VIEWS = {
   settings: renderSettings,
   documents: renderDocuments,
   announcements: renderAnnouncements,
+  latelist: renderLate,
+  ai: renderAi,
 };
 
 const state = { data: cacheData(), profile: null, isLoggedIn: false };

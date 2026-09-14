@@ -56,6 +56,24 @@ export function render(state, root) {
     </div>
 
     <div class="card mt">
+      <h2>AI assistant</h2>
+      <p class="small muted">Powered the AI tab. Your key is stored locally and only ever sent to the provider endpoint you choose. GitHub Copilot works best with a GitHub token from an account that has Copilot.</p>
+      <div class="field"><span>Provider</span>
+        <select id="aiProvider">
+          <option value="openai" ${s.aiProvider === "openai" ? "selected" : ""}>OpenAI-compatible (OpenAI, Azure, Together, LocalAI, Groq…)</option>
+          <option value="copilot" ${s.aiProvider === "copilot" ? "selected" : ""}>GitHub Copilot</option>
+        </select>
+      </div>
+      <div class="field"><span>Endpoint URL <span class="muted small">(/v1/chat/completions or Copilot's chat endpoint)</span></span><input id="aiUrl" value="${esc(s.aiUrl)}" placeholder="https://api.openai.com/v1/chat/completions" /></div>
+      <div class="grid grid-2">
+        <label class="field"><span>Model</span><input id="aiModel" value="${esc(s.aiModel)}" placeholder="gpt-4o" /></label>
+        <label class="field"><span>Key / token <span class="muted small">(never leaves your machine)</span></span><input id="aiKey" type="password" value="${esc(s.aiKey)}" autocomplete="off" /></label>
+      </div>
+      <p class="small muted mt" id="aiHint"></p>
+      <div class="mt"><button id="aiSaveNow" class="btn btn-primary btn-small">Save AI settings</button></div>
+    </div>
+
+    <div class="card mt">
       <h2>Account access (Canvas email only)</h2>
       <p class="small muted">This app only accepts accounts tied to real Canvas emails. The email is verified from your Canvas profile when you connect.</p>
       <div class="field">
@@ -135,6 +153,31 @@ export function render(state, root) {
     s.allowedDomains = e.target.value.split(",").map((d) => d.trim().toLowerCase()).filter(Boolean); save();
   });
   root.querySelector("#setBlockMail")?.addEventListener("change", (e) => { s.blockPersonalEmails = e.target.checked; save(); });
+
+  const AI_HINTS = {
+    openai: "OpenAI-compatible: works with OpenAI, Azure OpenAI, Groq, Together, LocalAI… Endpoint points at /v1/chat/completions.",
+    copilot: "GitHub Copilot: uses api.githubcopilot.com. Needs a token from a GitHub account with an active Copilot subscription. Unofficial endpoint; may change.",
+  };
+  const AI_URLS = { openai: "https://api.openai.com/v1/chat/completions", copilot: "https://api.githubcopilot.com/chat/completions" };
+  const setAiHint = () => {
+    const sel = root.querySelector("#aiProvider");
+    const hint = root.querySelector("#aiHint");
+    if (sel && hint) hint.textContent = AI_HINTS[sel.value] || "";
+  };
+  setAiHint();
+  root.querySelector("#aiProvider")?.addEventListener("change", (e) => {
+    const url = root.querySelector("#aiUrl");
+    if (url && !url.value) url.value = AI_URLS[e.target.value] || "";
+    setAiHint();
+  });
+  root.querySelector("#aiSaveNow")?.addEventListener("click", () => {
+    s.aiProvider = root.querySelector("#aiProvider").value;
+    s.aiUrl = root.querySelector("#aiUrl").value.trim();
+    s.aiModel = root.querySelector("#aiModel").value.trim();
+    s.aiKey = root.querySelector("#aiKey").value.trim();
+    save();
+    toast("AI settings saved.");
+  });
 
   root.querySelector("#tgtRegular")?.addEventListener("change", (e) => { s.targets.regular = +e.target.value; save(); });
   root.querySelector("#tgtHonors")?.addEventListener("change", (e) => { s.targets.honors = +e.target.value; save(); });

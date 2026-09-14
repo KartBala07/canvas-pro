@@ -128,6 +128,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path.startswith("/api/ai"):
+            return self.do_AI()
         if self.path.startswith("/api/canvas"):
             return self.do_CANVAS(method="POST", body=self._read_body())
         return super().do_POST()
@@ -141,6 +143,39 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith("/api/canvas"):
             return self.do_CANVAS(method="DELETE", body=self._read_body())
         return super().do_DELETE()
+
+    def do_AI(self):
+        body = self._read_body()
+        url = self.headers.get("X-AI-Url", "").strip()
+        if not url:
+            return self.send_error(400, "Missing X-AI-Url header")
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        key = self.headers.get("X-AI-Key", "").strip()
+        if key:
+            headers["Authorization"] = "Bearer " + key
+        req = urllib.request.Request(url, data=body, method="POST", headers=headers)
+        try:
+            resp = urllib.request.urlopen(req, timeout=240)
+        except HTTPError as e:
+            err = e.read()[:2000]
+            self.send_response(e.code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(err)))
+            self.end_headers()
+            self.wfile.write(err)
+            return
+        except Exception as e:
+            return self.send_error(502, "AI upstream error: " + str(e)[:200])
+        data = resp.read()
+        self.send_response(resp.getcode() or 200)
+        ctype = resp.headers.get("Content-Type") or "application/json; charset=utf-8"
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
 def pick_port():
     for port in range(PORT_START, PORT_START + 20):
