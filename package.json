@@ -5,8 +5,8 @@
   "type": "module",
   "description": "A grade-aware Canvas web app: dashboard, to-do, study plan, and curve calculator.",
   "scripts": {
-    "start": "python3 -m http.server 8000",
-    "serve": "python3 -m http.server 8000",
+    "start": "python3 server.py",
+    "serve": "python3 server.py",
     "check": "for f in js/*.js js/ui/*.js; do node --check \"$f\" || exit 1; done; echo 'syntax OK'"
   }
 }
