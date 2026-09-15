@@ -496,6 +496,30 @@ input[type=checkbox].todo-done:focus-visible { outline: 2px solid var(--accent);
   transition: border-color .15s, box-shadow .15s;
 }
 .field input:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* ---------- Add assignment / test modal ---------- */
+.add-task-modal .modal-head { align-items: center; }
+.add-task-modal .modal-head .muted { margin-top: 3px; }
+.add-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 16px; margin-top: 4px; }
+.add-grid .field { margin-top: 0; }
+.add-grid .field textarea {
+  width: 100%; padding: 11px 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
+  font-size: 14px; font-family: inherit; resize: vertical;
+  transition: border-color .15s, box-shadow .15s;
+}
+.add-grid .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.add-full { grid-column: 1 / -1; }
+.add-note {
+  margin-top: 16px; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  line-height: 1.5;
+}
+
+/* Submission unavailable (non-Canvas assignment types) */
+.submission-unavailable { padding: 22px 18px 28px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.submission-unavailable p { color: var(--muted); line-height: 1.6; }
 .hint { font-size: 12px; margin-top: 8px; }
 .error { color: var(--red); }
 .onboarding .btn { margin-top: 20px; }

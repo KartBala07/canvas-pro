@@ -1,5 +1,5 @@
 import { esc, fmtDate, pct, toast, daysUntil } from "../utils.js";
-import { settings, saveSettings, doneIds, setDone } from "../storage.js";
+import { settings, saveSettings, doneIds, setDone, saveLocalTask } from "../storage.js";
 import { generateSchedule } from "../schedule.js";
 import * as canvas from "../canvas.js";
 import { openTask } from "./taskdetail.js";
@@ -652,17 +652,33 @@ function openAddAssignmentModal(courseId, state, isTest) {
   const wrap = document.createElement("div");
   wrap.className = "modal-overlay";
   wrap.innerHTML = `
-    <div class="modal modal-wide">
+    <div class="modal modal-wide add-task-modal">
       <div class="modal-head">
-        <h2>${isTest ? "Add Test / Quiz" : "Add Assignment"}</h2>
+        <div>
+          <h2>${isTest ? "Add Test / Quiz" : "Add Assignment"}</h2>
+          <div class="small muted">for ${esc(course.name)}</div>
+        </div>
         <button class="btn btn-small btn-ghost" data-close>✕</button>
       </div>
       <form id="addTaskForm">
-        <div class="form-row"><label>Title <input name="title" required placeholder="e.g. Chapter 3 Homework"></label></div>
-        <div class="form-row"><label>Type <select name="type">${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label></div>
-        <div class="form-row"><label>Due Date <input name="dueAt" type="datetime-local"></label></div>
-        <div class="form-row"><label>Points Possible <input name="points" type="number" min="0" step="1" value="10"></label></div>
-        <div class="form-row"><label>Description <textarea name="desc" rows="3" placeholder="Optional details..."></textarea></label></div>
+        <div class="add-grid">
+          <label class="field add-full"><span>Title</span>
+            <input name="title" required autofocus placeholder="e.g. Chapter 3 Homework">
+          </label>
+          <label class="field"><span>Type</span>
+            <select name="type">${types.map((t) => `<option value="${t}" ${t === (isTest ? "exam" : "assignment") ? "selected" : ""}>${t}</option>`).join("")}</select>
+          </label>
+          <label class="field"><span>Points possible</span>
+            <input name="points" type="number" min="0" step="any" value="10">
+          </label>
+          <label class="field add-full"><span>Due date &amp; time <span class="muted small">(optional)</span></span>
+            <input name="dueAt" type="datetime-local">
+          </label>
+          <label class="field add-full"><span>Description <span class="muted small">(optional)</span></span>
+            <textarea name="desc" rows="3" placeholder="Optional details…"></textarea>
+          </label>
+        </div>
+        <p class="small muted add-note"><b>Stored on this device</b> — appears in Assignments, To-Do and Study like any Canvas task, and survives refreshes. If it's a real class assignment, add it on Canvas and sync instead.</p>
         <div class="modal-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
           <button type="submit" class="btn btn-primary">Create</button>
@@ -705,10 +721,11 @@ function openAddAssignmentModal(courseId, state, isTest) {
       isLocal: true,
     };
     state.data.tasks.push(task);
+    saveLocalTask(task);
     const root = document.getElementById("mainContent");
     if (state.ui?.courseDetailId === courseId) render(state, root, () => false);
     close();
-    toast(`Created ${isTest ? "test" : "assignment"} locally.`);
+    toast(`Created ${isTest ? "test" : "assignment"} — stored locally.`);
   });
 }
 

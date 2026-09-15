@@ -119,6 +119,17 @@ const SUBMISSION_TYPES = [
 ];
 
 export function openSubmissionModal(task, state, onClose) {
+  // Only show submission methods the assignment actually accepts. Fall back to
+  // showing all when Canvas didn't tell us (todo-feed / local tasks).
+  const allowed = Array.isArray(task.submissionTypes) && task.submissionTypes.length
+    ? task.submissionTypes
+    : SUBMISSION_TYPES.map((t) => t.id);
+  const tabs = SUBMISSION_TYPES.filter((t) => allowed.includes(t.id));
+  const blocked = Array.isArray(task.submissionTypes) && task.submissionTypes.length
+    ? task.submissionTypes.filter((t) => /external_tool|discussion_topic|wiki_page|basic_lti_launch/i.test(t))
+    : [];
+  const canSubmit = tabs.length > 0;
+
   const wrap = document.createElement("div");
   wrap.className = "modal-overlay";
   wrap.innerHTML = `
@@ -127,13 +138,14 @@ export function openSubmissionModal(task, state, onClose) {
         <h2>Submit: ${esc(task.title)}</h2>
         <button class="btn btn-small btn-ghost" data-close>✕</button>
       </div>
+      ${canSubmit ? `
       <div class="submission-tabs" role="tablist">
-        ${SUBMISSION_TYPES.map((t, i) => `
+        ${tabs.map((t, i) => `
           <button class="sub-tab ${i === 0 ? "active" : ""}" role="tab" aria-selected="${i === 0}" data-type="${t.id}">${t.icon} ${t.label}</button>
         `).join("")}
       </div>
       <div class="submission-panels">
-        ${SUBMISSION_TYPES.map((t, i) => `
+        ${tabs.map((t, i) => `
           <div class="sub-panel ${i === 0 ? "" : "hidden"}" role="tabpanel" data-type="${t.id}">
             ${renderSubmissionPanel(t, task)}
           </div>
@@ -142,11 +154,22 @@ export function openSubmissionModal(task, state, onClose) {
       <div class="modal-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
         <button class="btn btn-primary" id="doSubmit" disabled>Submit Assignment</button>
-      </div>
+      </div>` : `
+      <div class="submission-unavailable">
+        <p>This assignment isn't using Canvas's online submission — it expects something else${blocked.length ? " (" + esc(blocked.join(", ")) + ")" : ""}.</p>
+        ${task.htmlUrl ? `<a class="btn" href="${esc(task.htmlUrl)}" target="_blank" rel="noopener">Open on Canvas ↗</a>` : ""}
+        <button class="btn btn-ghost" data-close>Close</button>
+      </div>`}
     </div>
   `;
   document.body.appendChild(wrap);
   requestAnimationFrame(() => wrap.classList.remove("hidden"));
+
+  if (!canSubmit) {
+    wrap.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+    return;
+  }
 
   const close = () => { wrap.classList.add("hidden"); setTimeout(() => wrap.remove(), 200); };
   wrap.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));

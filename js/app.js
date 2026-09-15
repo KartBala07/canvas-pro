@@ -305,7 +305,10 @@ async function init() {
       state.data = cached;
       showApp();
       renderTab("dashboard");
-      setSync("Loaded offline · refresh to sync", "");
+      setSync("Loaded offline · refreshing…", "");
+      // Auto-sync in the background: the cached view is instant, then grades /
+      // to-dos update when the fresh data lands.
+      setTimeout(() => fetchAll().catch(() => setSync("Sync failed", "err")), 350);
     } else if (!(await connectAndLoad())) {
       // Couldn't reconnect; keep the connect screen visible with the error.
     } else {
