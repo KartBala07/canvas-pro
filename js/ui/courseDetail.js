@@ -1,6 +1,7 @@
 import { esc, fmtDate, pct, toast, daysUntil } from "../utils.js";
 import { settings, saveSettings, doneIds, setDone, saveLocalTask } from "../storage.js";
 import { generateSchedule } from "../schedule.js";
+import { parseSyllabus } from "../syllabus.js";
 import * as canvas from "../canvas.js";
 import { openTask } from "./taskdetail.js";
 
@@ -247,6 +248,64 @@ function projectedTotal(courseTasks, whatIf) {
   };
 }
 
+const TYPE_LABEL = { assignment: "Assignments", quiz: "Quizzes", exam: "Tests/Exams", project: "Projects", participation: "Participation" };
+
+function weightSourceFor(courseId, courseTasks, s) {
+  const syll = s.syllabus?.[courseId] || s.syllabus?._all || null;
+  const mode = syll?.mode || "auto";
+  const canvas = courseTasks.some((t) => t.groupWeight != null);
+  const sy = syll?.weights || {};
+  const hasSyll = Object.values(sy).some((v) => v != null);
+  const useCanvas = mode === "canvas" || (mode === "auto" && canvas);
+  const useSyllabus = mode === "syllabus" || (mode === "auto" && !canvas);
+  return { mode, useCanvas, useSyllabus, canvas, hasSyll, syll };
+}
+
+function weightOf(t, src) {
+  if (src.useCanvas && t.groupWeight != null) return t.groupWeight;
+  if (src.useSyllabus && src.syll?.weights?.[t.type] != null) return src.syll.weights[t.type];
+  return null;
+}
+
+function bucketOf(t, src) {
+  if (src.useCanvas && t.groupWeight != null) return t.groupName || "Other";
+  if (src.useSyllabus) return TYPE_LABEL[t.type] || "Other";
+  return t.groupName || "Other";
+}
+
+function methodLabel(src) {
+  if (src.useCanvas && src.canvas) return "Canvas assignment groups";
+  if (src.useSyllabus && src.hasSyll) return "Syllabus weights";
+  return "Point totals (no category weights)";
+}
+
+// Weighted projected grade: each category's % weighted by its category weight.
+// Returns { pct, buckets, count, excluded }.
+function weightedProjected(courseTasks, whatIf, src) {
+  const buckets = new Map();
+  let excluded = 0;
+  for (const t of courseTasks) {
+    const p = t.pointsPossible || 0;
+    if (!p) continue;
+    const e = effectiveEarned(t, whatIf);
+    if (e == null) { excluded++; continue; }
+    const key = bucketOf(t, src);
+    if (!buckets.has(key)) buckets.set(key, { w: weightOf(t, src), earned: 0, possible: 0 });
+    const b = buckets.get(key);
+    b.earned += e;
+    b.possible += p;
+  }
+  let num = 0, den = 0, count = 0;
+  for (const b of buckets.values()) {
+    if (b.w == null || !b.possible) continue;
+    const pct = (b.earned / b.possible) * 100;
+    num += pct * b.w;
+    den += b.w;
+    count++;
+  }
+  return count ? { pct: Math.round((num / den) * 10) / 10, buckets, count, excluded } : { pct: null, buckets, count, excluded };
+}
+
 function gradesPanel(course, tasks, whatIf) {
   const courseTasks = tasks.filter((t) => t.courseId === course.id);
   const sorted = [...courseTasks].sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));
@@ -255,22 +314,27 @@ function gradesPanel(course, tasks, whatIf) {
     const poss = actualTasks.reduce((s, t) => s + (t.pointsPossible || 0), 0);
     return poss > 0 ? Math.round((actualTasks.reduce((s, t) => s + (t.pointsEarned || 0), 0) / poss) * 1000) / 10 : null;
   })();
+  const src = weightSourceFor(course.id, courseTasks, settings());
+  const wproj = weightedProjected(courseTasks, whatIf, src);
   const proj = projectedTotal(courseTasks, whatIf);
+  const headPct = wproj.pct ?? proj.pct;
+  const method = methodLabel(src);
   const target = course.targetGrade || 93;
-  const fill = Math.max(0, Math.min(100, proj.pct || 0));
-  const delta = proj.pct != null ? Math.round((proj.pct - target) * 10) / 10 : null;
+  const fill = Math.max(0, Math.min(100, headPct || 0));
+  const delta = headPct != null ? Math.round((headPct - target) * 10) / 10 : null;
   const deltaCls = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
 
   const rows = sorted.map((t) => {
     const gradedRow = t.pointsEarned != null;
     const possible = t.pointsPossible || 0;
     const actual = gradedRow ? t.pointsEarned : null;
+    const w = weightOf(t, src);
     const override = whatIf[t.id];
     const value = override != null ? override : (actual != null ? actual : "");
     return `
       <tr class="${gradedRow ? "" : "gwi-ungraded"}">
         <td><b>${esc(t.title)}</b> ${t.submitted && !gradedRow ? `<span class="tag tag-yellow small">Submitted</span>` : ""}</td>
-        <td class="small muted">${esc(t.groupName || (t.type === "exam" ? "Test" : "Assignment"))}</td>
+        <td class="small muted">${esc(t.groupName || (t.type === "exam" ? "Test" : "Assignment"))}${w != null ? `<span class="small tag tag-blue">${w}%</span>` : ""}</td>
         <td>${possible ? possible : "—"}</td>
         <td>${actual != null ? `${actual} <span class="small muted">/ ${possible}</span>` : '<span class="small muted">Not graded</span>'}</td>
         <td><input class="gwi-input" type="number" min="0" max="${possible || ""}" step="any" inputmode="decimal"
@@ -280,31 +344,27 @@ function gradesPanel(course, tasks, whatIf) {
   }).join("");
 
   const groupRows = (() => {
-    const groups = {};
-    courseTasks.forEach((t) => {
-      const g = t.groupName || "Ungrouped";
-      const p = t.pointsPossible || 0;
-      const e = effectiveEarned(t, whatIf);
-      if (!p || e == null) return;
-      if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
-      groups[g].earned += e;
-      groups[g].possible += p;
-    });
-    return Object.entries(groups).map(([name, g]) => `
+    if (!wproj.buckets.size) return "";
+    return [...wproj.buckets.entries()].map(([name, g]) => `
       <tr>
         <td>${esc(name)}</td>
+        <td>${g.w != null ? g.w + "%" : "—"}</td>
         <td>${Math.round(g.earned * 100) / 100}</td>
         <td>${g.possible}</td>
-        <td>${Math.round((g.earned / g.possible) * 1000) / 10 + "%"}</td>
+        <td>${g.w != null ? Math.round((g.earned / g.possible) * 1000) / 10 + "%" : "—"}</td>
+        <td>${g.w != null ? Math.round((g.earned / g.possible || 0) * g.w * 10) / 10 : "—"}</td>
       </tr>`).join("");
   })();
+
+  const excludedNote = (wproj.excluded || proj.excluded) ? `Excludes ${wproj.excluded || proj.excluded} ungraded (enter points to include)` : "";
 
   return `
     <div class="tab-panel" id="grades-panel" role="tabpanel">
       <div class="panel-toolbar">
         <h2>Grades — what-if calculator</h2>
         <div class="toolbar-actions">
-          <span class="small muted" id="gwiStatus">${proj.excluded ? `Excludes ${proj.excluded} ungraded (enter points to include)` : ""}</span>
+          <button class="btn btn-ghost btn-small" id="openWeights" data-open-syllabus="${course.id}">Edit weights</button>
+          <span class="small muted" id="gwiStatus">${excludedNote}</span>
           <button class="btn btn-ghost btn-small" id="resetWhatIf">Reset</button>
         </div>
       </div>
@@ -313,22 +373,26 @@ function gradesPanel(course, tasks, whatIf) {
         <div class="grade-card">
           <div class="grade-ring large" id="gwiRing" style="--score:${fill}" role="img" aria-label="Projected grade">
             <div class="grade-ring-inner">
-              <div class="grade-value" id="gwiPct">${proj.pct != null ? proj.pct + "%" : "—"}</div>
+              <div class="grade-value" id="gwiPct">${headPct != null ? headPct + "%" : "—"}</div>
               <div class="grade-target">Projected</div>
             </div>
           </div>
           <div class="grade-details">
-            <div id="gwiLetter">Letter ${esc(letterFromPct(proj.pct) || "—")}</div>
+            <div id="gwiLetter">Letter ${esc(letterFromPct(headPct) || "—")}</div>
             <div>Actual: ${actualPct != null ? actualPct + "%" : "—"}</div>
             <div id="gwiDelta" class="${deltaCls}">${delta != null ? (delta >= 0 ? "✓ +" + delta : "⚠ " + delta) + " vs " + target + "% target" : "No graded work yet"}</div>
           </div>
+          <span class="small muted">${wproj.count >= 2 ? "Weighted across " + wproj.count + " categories" : "Point-based projected grade"}</span>
         </div>
         <div class="grade-breakdown">
-          <h3>By Assignment Group <span class="small muted">(point-based, incl. what-if)</span></h3>
+          <h3>By Category <span class="small muted">· ${esc(method)}</span></h3>
+          ${wproj.buckets.size ? `
           <table class="grade-table">
-            <thead><tr><th>Group</th><th>Earned</th><th>Possible</th><th>%</th></tr></thead>
+            <thead><tr><th>Category</th><th>Weight</th><th>Earned</th><th>Possible</th><th>%</th><th>Contrib.</th></tr></thead>
             <tbody id="gwiGroups">${groupRows}</tbody>
-          </table>
+          </table>` : `<p class="small muted">No graded category data yet.</p>`}
+          ${!src.canvas && !src.useSyllabus ? `
+          <p class="small muted">No category weights on Canvas for this course. Paste your syllabus in <b>Edit weights</b> — or it may just be a flat point-based class.</p>` : ""}
         </div>
       </div>
 
@@ -573,6 +637,7 @@ function attachSharedHandlers(root, state, course, allTasks, done, isStale) {
     btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, { ...state, data: { ...state.data, tasks: allTasks } }, true));
   });
   root.querySelector(".open-syllabus")?.addEventListener("click", () => openSyllabusModal(course, state));
+  root.querySelectorAll("[data-open-syllabus]").forEach((btn) => btn.addEventListener("click", () => openSyllabusModal(course, state)));
 
   // What-if grade calculator on the Grades tab
   const gwi = root.querySelector("#grades-panel");
@@ -591,43 +656,39 @@ function attachSharedHandlers(root, state, course, allTasks, done, isStale) {
       state.ui.whatIf[course.id] = whatIf;
 
       const courseTasks = allTasks.filter((t) => t.courseId === course.id);
+      const src = weightSourceFor(course.id, courseTasks, settings());
+      const wproj = weightedProjected(courseTasks, whatIf, src);
       const proj = projectedTotal(courseTasks, whatIf);
+      const headPct = wproj.pct ?? proj.pct;
       const target = course.targetGrade || 93;
-      const delta = proj.pct != null ? Math.round((proj.pct - target) * 10) / 10 : null;
+      const delta = headPct != null ? Math.round((headPct - target) * 10) / 10 : null;
       const ring = gwi.querySelector("#gwiRing");
       const pctEl = gwi.querySelector("#gwiPct");
       const letterEl = gwi.querySelector("#gwiLetter");
       const deltaEl = gwi.querySelector("#gwiDelta");
       const statusEl = gwi.querySelector("#gwiStatus");
 
-      if (ring) ring.style.setProperty("--score", Math.max(0, Math.min(100, proj.pct || 0)));
-      if (pctEl) pctEl.textContent = proj.pct != null ? proj.pct + "%" : "—";
-      if (letterEl) letterEl.textContent = "Letter " + (letterFromPct(proj.pct) || "—");
+      if (ring) ring.style.setProperty("--score", Math.max(0, Math.min(100, headPct || 0)));
+      if (pctEl) pctEl.textContent = headPct != null ? headPct + "%" : "—";
+      if (letterEl) letterEl.textContent = "Letter " + (letterFromPct(headPct) || "—");
       if (deltaEl) {
         deltaEl.textContent = delta != null ? (delta >= 0 ? "✓ +" + delta : "⚠ " + delta) + " vs " + target + "% target" : "No graded work yet";
         deltaEl.className = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
       }
-      if (statusEl) statusEl.textContent = proj.excluded ? `Excludes ${proj.excluded} ungraded (enter points to include)` : "";
+      const excl = wproj.excluded || proj.excluded;
+      if (statusEl) statusEl.textContent = excl ? `Excludes ${excl} ungraded (enter points to include)` : "";
 
-      // Rebuild the group table
+      // Rebuild the category table (weighted)
       const tbody = gwi.querySelector("#gwiGroups");
       if (tbody) {
-        const groups = {};
-        courseTasks.forEach((t) => {
-          const g = t.groupName || "Ungrouped";
-          const p = t.pointsPossible || 0;
-          const e = effectiveEarned(t, whatIf);
-          if (!p || e == null) return;
-          if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
-          groups[g].earned += e;
-          groups[g].possible += p;
-        });
-        tbody.innerHTML = Object.entries(groups).map(([name, g]) => `
+        tbody.innerHTML = [...wproj.buckets.entries()].map(([name, g]) => `
           <tr>
             <td>${esc(name)}</td>
+            <td>${g.w != null ? g.w + "%" : "—"}</td>
             <td>${Math.round(g.earned * 100) / 100}</td>
             <td>${g.possible}</td>
-            <td>${Math.round((g.earned / g.possible) * 1000) / 10 + "%"}</td>
+            <td>${g.w != null ? Math.round((g.earned / g.possible) * 1000) / 10 + "%" : "—"}</td>
+            <td>${g.w != null ? Math.round((g.earned / g.possible || 0) * g.w * 10) / 10 : "—"}</td>
           </tr>`).join("");
       }
     };
@@ -731,16 +792,43 @@ function openAddAssignmentModal(courseId, state, isTest) {
 
 function openSyllabusModal(course, state) {
   const s = settings();
-  const syll = s.syllabus?.[course.id] || s.syllabus?._all || { weights: {}, latePolicy: null, raw: "" };
+  const syll = s.syllabus?.[course.id] || s.syllabus?._all || { mode: "auto", weights: {}, latePolicy: null, raw: "" };
+  const courseTasks = (state.data?.tasks || []).filter((t) => t.courseId === course.id);
+  const canvasWeights = [...new Map(courseTasks.filter((t) => t.groupWeight != null).map((t) => [t.groupName, t.groupWeight])).entries()]
+    .sort((a, b) => (b[1] || 0) - (a[1] || 0));
   const wrap = document.createElement("div");
   wrap.className = "modal-overlay";
   wrap.innerHTML = `
     <div class="modal modal-wide">
       <div class="modal-head"><h2>Syllabus: ${esc(course.name)}</h2><button class="btn btn-small btn-ghost" data-close>✕</button></div>
       <div class="modal-body">
-        <div class="field"><label>Weights JSON</label><textarea id="syllWeights" rows="5">${esc(JSON.stringify(syll.weights || {}, null, 2))}</textarea></div>
-        <div class="field"><label>Late Policy JSON</label><textarea id="syllLate" rows="5">${esc(JSON.stringify(syll.latePolicy || {}, null, 2))}</textarea></div>
-        <div class="field"><label>Raw Text</label><textarea id="syllRaw" rows="6">${esc(syll.raw || "")}</textarea></div>
+        <p class="small muted">Canvas already sends category weights with each assignment — the app uses them automatically, no syllabus needed. Paste a syllabus to override the categories with your own weights.</p>
+
+        <div class="field"><span>Weight source</span>
+          <select id="syllMode">
+            <option value="auto" ${(syll.mode || "auto") === "auto" ? "selected" : ""}>Auto — Canvas groups, else syllabus</option>
+            <option value="canvas" ${syll.mode === "canvas" ? "selected" : ""}>Canvas groups only</option>
+            <option value="syllabus" ${syll.mode === "syllabus" ? "selected" : ""}>Syllabus (type-based) only</option>
+            <option value="off" ${syll.mode === "off" ? "selected" : ""}>Off — plain point totals</option>
+          </select>
+        </div>
+
+        ${canvasWeights.length ? `
+        <div class="field"><span>Pulled off Canvas right now</span>
+          <div class="canvas-weights">
+            ${canvasWeights.map(([name, w]) => `<span class="tag tag-blue">${esc(name)} · ${w}%</span>`).join(" ")}
+          </div>
+        </div>` : `<p class="small muted">No category weights found on Canvas for this course — it's probably point-based, or weights live in the syllabus below.</p>`}
+
+        <div class="field"><span>Paste syllabus text → auto-extract weights &amp; late policy</span>
+          <textarea id="syllRaw" rows="5" placeholder="e.g.  Homework 20%&#10;Quizzes 30%&#10;Tests and Final 40%&#10;Participation 10%&#10;Late work only accepted within 2 days, −10% per day">${esc(syll.raw || "")}</textarea>
+          <button class="btn btn-small mt" id="extractSyllabus">Extract weights + late policy</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="field"><span>Weights (JSON, one per category)</span><textarea id="syllWeights" rows="5">${esc(JSON.stringify(syll.weights || {}, null, 2))}</textarea></div>
+          <div class="field"><span>Late Policy (JSON)</span><textarea id="syllLate" rows="5">${esc(JSON.stringify(syll.latePolicy || {}, null, 2))}</textarea></div>
+        </div>
       </div>
       <div class="modal-foot"><button class="btn btn-primary" id="saveSyllabus">Save</button><button class="btn btn-ghost" data-close>Cancel</button></div>
     </div>
@@ -752,16 +840,27 @@ function openSyllabusModal(course, state) {
   wrap.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
   wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
 
+  wrap.querySelector("#extractSyllabus").addEventListener("click", () => {
+    const parsed = parseSyllabus(wrap.querySelector("#syllRaw").value);
+    wrap.querySelector("#syllWeights").value = JSON.stringify(parsed.weights, null, 2);
+    wrap.querySelector("#syllLate").value = JSON.stringify(parsed.latePolicy, null, 2);
+    wrap.querySelector("#syllMode").value = "syllabus";
+    toast(parsed.latePolicy.noLate ? "Note: syllabus says no late work accepted." : "Weights extracted from syllabus.");
+  });
+
   wrap.querySelector("#saveSyllabus").addEventListener("click", () => {
     try {
       const weights = JSON.parse(wrap.querySelector("#syllWeights").value || "{}");
       const latePolicy = JSON.parse(wrap.querySelector("#syllLate").value || "{}");
       const raw = wrap.querySelector("#syllRaw").value;
+      const mode = wrap.querySelector("#syllMode").value;
       s.syllabus = s.syllabus || {};
-      s.syllabus[course.id] = { weights, latePolicy, raw };
+      s.syllabus[course.id] = { mode, weights, latePolicy, raw };
       saveSettings();
-      toast("Syllabus saved for this course.");
+      toast("Syllabus saved — grading now uses these weights.");
       close();
+      const root = document.getElementById("mainContent");
+      if (state.ui?.courseDetailId === course.id) render(state, root, () => false);
     } catch (e) {
       toast("Invalid JSON: " + e.message, "err");
     }

@@ -129,7 +129,6 @@ export function render(state, root) {
     });
   });
 
-  // Click a planned slot to open the assignment right here.
   const openFromSlot = (id) => {
     const t = merged.find((x) => x.id === id);
     if (t) openTask(t, state);

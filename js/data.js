@@ -95,11 +95,14 @@ async function mapWithConcurrency(items, fn, size = 6) {
 
 export async function loadAll(onStage) {
   const label = onStage || (() => {});
-  label("Fetching profile…");
-  const profile = await canvas.getProfile();
+  label("Syncing with Canvas…");
+  const [profile, courseRaw, todos] = await Promise.all([
+    canvas.getProfile().catch((e) => { console.warn("Profile fetch failed", e); return { name: "", id: "" }; }),
+    canvas.getCourses().catch((e) => { console.warn("Course fetch failed", e); return []; }),
+    canvas.getTodos().catch((e) => { console.warn("Todo fetch failed", e); return []; }),
+  ]);
 
   label("Fetching courses…");
-  const courseRaw = await canvas.getCourses();
   const courses = courseRaw
     .filter((c) => c.enrollments?.some((e) => /student/i.test(e.type)))
     .map(normalizeCourse)
@@ -112,10 +115,6 @@ export async function loadAll(onStage) {
   });
   const courseGroups = new Map();
   courses.forEach((c, i) => courseGroups.set(c.id, groupSets[i]));
-
-  label("Fetching to-do list…");
-  let todos = [];
-  try { todos = await canvas.getTodos(); } catch (e) { console.warn("Todo fetch failed", e); }
 
   const tasks = [];
   const groupWeightOf = (courseId, groupId) => {

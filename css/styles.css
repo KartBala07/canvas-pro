@@ -1,5 +1,6 @@
 /* ---------- Theme tokens (midnight = default) ---------- */
 :root {
+  color-scheme: dark;
   --bg: #0f1220;
   --bg-soft: #171b2e;
   --card: #1c2137;
@@ -27,6 +28,7 @@
 
 /* Midnight, light (cool blue-white cloud) */
 html[data-theme="midnight-light"] {
+  color-scheme: light;
   --bg: #eef1fa;
   --bg-soft: #e2e7f3;
   --card: #ffffff;
@@ -77,6 +79,7 @@ html[data-theme="earthy"] {
 
 /* Earthy, light (warm sand) */
 html[data-theme="earthy-light"] {
+  color-scheme: light;
   --bg: #f2e9da;
   --bg-soft: #e8dcc4;
   --card: #fbf6ec;
@@ -127,6 +130,7 @@ html[data-theme="earthy-green"] {
 
 /* Forest greens, light */
 html[data-theme="earthy-green-light"] {
+  color-scheme: light;
   --bg: #eff4e8;
   --bg-soft: #e2ead4;
   --card: #fbfdf5;
@@ -152,6 +156,7 @@ html[data-theme="earthy-green-light"] {
 
 /* Cream, light (default light) */
 html[data-theme="cream"] {
+  color-scheme: light;
   --bg: #f6ecd9;
   --bg-soft: #efdfc4;
   --card: #fffcf4;
@@ -370,7 +375,7 @@ h2 { font-size: 17px; margin-bottom: 12px; }
 .card:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 
 .card + .card { margin-top: 16px; }
-.grid { display: grid; gap: 16px; }
+.grid, .grid-2 { display: grid; gap: 16px; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -474,6 +479,56 @@ input[type=checkbox].todo-done:active { transform: scale(.86); }
 input[type=checkbox].done-box:focus-visible,
 input[type=checkbox].todo-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* ---------- Every other checkbox (kept native before — ugly) ---------- */
+input[type=checkbox]:not(.done-box):not(.todo-done) {
+  -webkit-appearance: none; appearance: none;
+  width: 17px; height: 17px; border-radius: 5px;
+  border: 1.5px solid var(--muted);
+  background: var(--bg-soft);
+  display: inline-grid; place-content: center;
+  cursor: pointer; vertical-align: -3px;
+  transition: background .15s, border-color .15s, box-shadow .15s, transform .08s;
+}
+input[type=checkbox]:not(.done-box):not(.todo-done):hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+input[type=checkbox]:not(.done-box):not(.todo-done):checked {
+  background: var(--accent); border-color: var(--accent);
+  animation: popIn .18s ease;
+}
+input[type=checkbox]:not(.done-box):not(.todo-done):checked::after {
+  content: ""; width: 8px; height: 4px;
+  border-left: 2.5px solid var(--check-mark, #fff);
+  border-bottom: 2.5px solid var(--check-mark, #fff);
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+input[type=checkbox]:not(.done-box):not(.todo-done):active { transform: scale(.88); }
+input[type=checkbox]:not(.done-box):not(.todo-done):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Selects (custom arrow instead of the OS one) ---------- */
+select {
+  -webkit-appearance: none; appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888fa8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 13px;
+  cursor: pointer;
+}
+select:hover { border-color: var(--accent); }
+
+/* ---------- Number steppers (hidden — type or use the keyboard) ---------- */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ---------- Date/time pickers (tinted glyphs; popup matches via color-scheme) ---------- */
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=time]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+input[type=date]::-webkit-calendar-picker-indicator:hover,
+input[type=time]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
 /* ---------- Onboarding ---------- */
 .onboarding {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -496,6 +551,14 @@ input[type=checkbox].todo-done:focus-visible { outline: 2px solid var(--accent);
   transition: border-color .15s, box-shadow .15s;
 }
 .field input:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.field textarea {
+  width: 100%; padding: 11px 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-soft); color: var(--text); font-size: 13px;
+  font-family: var(--mono); resize: vertical; line-height: 1.5;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.canvas-weights { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------- Add assignment / test modal ---------- */
 .add-task-modal .modal-head { align-items: center; }
@@ -608,6 +671,41 @@ tr.done td:first-child { text-decoration: none; }
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+
+/* ---------- Dashboard: "This week on Canvas" calendar ---------- */
+.week-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.day-col {
+  background: var(--bg-soft); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  min-height: 122px;
+}
+.day-col.today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px var(--glow-a);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-soft));
+}
+.day-head { display: flex; justify-content: space-between; align-items: baseline; }
+.day-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.day-col.today .day-name { color: var(--accent); }
+.day-date { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.day-items { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.day-empty { color: var(--muted); font-size: 11px; }
+.wk-chip {
+  text-align: left; display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 9px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); cursor: pointer; font-family: inherit;
+  font-size: 12px; line-height: 1.3; min-width: 0;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.wk-chip:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 3px 8px var(--glow-a); }
+.wk-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wk-chip.exam { border-left: 3px solid var(--red); }
+.wk-chip.quiz { border-left: 3px solid var(--yellow); }
+.wk-chip.project { border-left: 3px solid var(--purple); }
+.wk-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-meta { color: var(--muted); font-size: 11px; }
+@media (max-width: 980px) { .week-cal { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 620px) { .week-cal { grid-template-columns: 1fr; } }
 
 /* ---------- Loading ---------- */
 .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0; gap: 16px; }

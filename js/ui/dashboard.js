@@ -67,6 +67,36 @@ const courseCards = courses.map((c) => {
       <span class="mins">${s.mins}m</span>
     </div>`).join("") || `<p class="muted">No study time scheduled. Adjust Settings → Study Time.</p>`;
 
+  const week = Array.from({ length: 7 }, () => []);
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  for (const t of open) {
+    if (!t.dueAt) continue;
+    const dued = new Date(t.dueAt); dued.setHours(0, 0, 0, 0);
+    const diff = Math.round((dued - start) / 86400000);
+    if (diff >= 0 && diff < 7) week[diff].push(t);
+  }
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekCards = week.map((items, i) => {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const isToday = i === 0;
+    const chips = items
+      .sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || "") || (a.title || "").localeCompare(b.title || ""))
+      .map((t) => `
+        <button class="wk-chip ${t.type}" data-task="${esc(t.id)}" title="${esc(t.courseName)} · open assignment">
+          <span class="wk-title">${esc(t.title)}</span>
+          <span class="wk-meta">${t.type === "exam" ? "Test" : t.type === "quiz" ? "Quiz" : t.type === "project" ? "Project" : ""}${t.pointsPossible ? ` · ${t.pointsPossible} pts` : ""}</span>
+        </button>`).join("");
+    return `
+      <div class="day-col ${isToday ? "today" : ""}">
+        <div class="day-head">
+          <span class="day-name">${isToday ? "Today" : DAY_NAMES[d.getDay()]}</span>
+          <span class="day-date">${d.getMonth() + 1}/${d.getDate()}</span>
+        </div>
+        <div class="day-items">${chips || `<span class="day-empty">Free</span>`}</div>
+      </div>`;
+  }).join("");
+  const weekCount = week.reduce((a, d) => a + d.length, 0);
+
   root.innerHTML = `
     <h1>Dashboard</h1>
     <p class="subtitle">${esc(state.profile?.name || "")} · ${avgGrade ? `avg grade <b>${(avgGrade / (courses.length || 1)).toFixed(1)}%</b>` : ""}</p>
@@ -76,6 +106,10 @@ const courseCards = courses.map((c) => {
       <div class="card"><div class="small muted">Due this week</div><div class="stat"><b>${dueWeek.length}</b></div></div>
       <div class="card"><div class="small muted">Classes</div><div class="stat"><b>${courses.length}</b></div></div>
     </div>
+
+    <h2 class="mt">This week on Canvas</h2>
+    <p class="small muted">${weekCount ? `${weekCount} open assignment${weekCount === 1 ? "" : "s"} due over the next 7 days — click any chip to open it.` : "Nothing due in the next 7 days."}</p>
+    <div class="week-cal mt">${weekCards}</div>
 
     <h2 class="mt">Classes & grades</h2>
     <div class="grid grid-3" id="courseGrid">${courseCards}</div>
@@ -95,7 +129,6 @@ const courseCards = courses.map((c) => {
     });
   });
 
-  // Nightly plan: click a slot to open that assignment.
   root.addEventListener("click", (e) => {
     const el = e.target.closest("[data-task]");
     if (!el) return;
