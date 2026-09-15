@@ -50,6 +50,18 @@ Vanilla ES modules, no build step, no framework. Runs on the user's machine:
   (local `opencode serve`, optional) | gemini | openai | openrouter | copilot.
 - Net-new topics: try to keep the shape match what's already there.
 
+## Task inbox (Obsidian vault)
+
+Use the Obsidian vault at `/Users/Devansh/opencode-vault` as the persistent
+inbox + log between the user and the agent. Read `README.md` there first.
+
+- `Ideas/Integrations.md` + `Ideas/Bugs.md` — the user drops in requested work
+  as `- [ ]` bullets. When the user says "check the vault", read these, work
+  through the requested (unchecked) items, and tick them `- [x]` when done.
+- `Logs/Integrations.md` + `Logs/Bugs.md` — after finishing each task, append a
+  dated `## YYYY-MM-DD — <title>` entry documenting what was done (files
+  touched, commit/rev, any caveats like "needs server restart").
+
 ## Security rules
 
 - The Canvas token and AI keys live in localStorage only, sent only to the
