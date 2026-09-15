@@ -52,6 +52,9 @@ export async function render(state, root, isStale = () => false) {
         <p class="subtitle">Announcements from all your courses (last 60 days).</p>
       </div>
       <div class="header-actions">
+        <label class="check" style="white-space:nowrap">
+          <input type="checkbox" id="annHideRead" title="Hide read announcements"> Hide read
+        </label>
         <button id="annMarkAll" class="btn btn-ghost btn-small hidden">Mark all read</button>
         <button id="annRefresh" class="btn btn-ghost btn-small" title="Refresh">↻</button>
       </div>
@@ -62,12 +65,15 @@ export async function render(state, root, isStale = () => false) {
   const list = root.querySelector("#annList");
   const markAll = root.querySelector("#annMarkAll");
   const refreshBtn = root.querySelector("#annRefresh");
+  const hideReadCb = root.querySelector("#annHideRead");
 
   const courses = state.data?.courses || [];
   if (!courses.length) {
     list.innerHTML = `<div class="card"><p class="muted">No courses. Refresh data first.</p></div>`;
     return;
   }
+
+  let allItems = [];
 
   const loadAnnouncements = async () => {
     list.innerHTML = `<div class="loading"><div class="spinner"></div><p class="muted small">Loading announcements…</p></div>`;
@@ -83,12 +89,16 @@ export async function render(state, root, isStale = () => false) {
       return;
     }
 
-    if (!items.length) {
-      if (isStale()) return;
-      list.innerHTML = `<div class="card"><p class="muted">No announcements in the last 60 days.</p></div>`;
-      markAll.classList.add("hidden");
-      return;
-    }
+    allItems = items;
+    renderList();
+    refreshBtn.addEventListener("click", loadAnnouncements);
+    hideReadCb.addEventListener("change", renderList);
+  };
+
+  function renderList() {
+    const hideRead = hideReadCb.checked;
+    const items = hideRead ? allItems.filter((a) => (a.read_state || "read") !== "read") : allItems;
+    const unread = allItems.filter((a) => (a.read_state || "read") !== "read").length;
 
     const courseName = (code) => {
       const id = parseInt(String(code || "").split("_")[1], 10);
@@ -96,11 +106,9 @@ export async function render(state, root, isStale = () => false) {
       return c ? c.name : code;
     };
     const base = settings().canvasBaseUrl || "";
-    const unread = items.filter((a) => (a.read_state || "read") !== "read").length;
-    if (isStale()) return;
 
     list.innerHTML = `
-      <p class="ann-summary">${items.length} announcement${items.length === 1 ? "" : "s"}${unread ? ` · <b style="color:var(--accent)">${unread} unread</b>` : ""}</p>
+      <p class="ann-summary">${items.length} announcement${items.length === 1 ? "" : "s"}${unread ? ` · <b style="color:var(--accent)">${unread} unread</b>` : ""}${hideRead ? ` · <span class="muted">(${allItems.length - items.length} hidden)</span>` : ""}</p>
       ${items.map((a) => annCard(a, courseName(a.context_code), base)).join("")}
     `;
     markAll.classList.toggle("hidden", unread === 0);
@@ -122,6 +130,7 @@ export async function render(state, root, isStale = () => false) {
           await canvas.markAnnouncementRead(cid, el.dataset.id);
           setRead(el);
           if (!list.querySelector(".ann-item:not(.read)")) markAll.classList.add("hidden");
+          renderList();
           toast("Marked as read.");
         } catch (e) {
           toast("Couldn't mark read: " + e.message, "err");
@@ -130,17 +139,17 @@ export async function render(state, root, isStale = () => false) {
     });
 
     markAll.addEventListener("click", async () => {
-      const todo = items.filter((a) => (a.read_state || "read") !== "read");
+      const todo = allItems.filter((a) => (a.read_state || "read") !== "read");
       for (const a of todo) {
         const cid = parseInt(String(a.context_code || "course_0").split("_")[1], 10);
         try { await canvas.markAnnouncementRead(cid, a.id); } catch {}
       }
       list.querySelectorAll(".ann-item").forEach((el) => setRead(el));
       markAll.classList.add("hidden");
+      renderList();
       toast(`Marked ${todo.length} announcement${todo.length === 1 ? "" : "s"} read.`);
     });
-  };
+  }
 
-  refreshBtn.addEventListener("click", loadAnnouncements);
   await loadAnnouncements();
 }

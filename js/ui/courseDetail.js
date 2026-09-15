@@ -1,10 +1,18 @@
-import { esc, fmtDate, pct, toast } from "../utils.js";
+import { esc, fmtDate, pct, toast, daysUntil } from "../utils.js";
 import { settings, saveSettings, doneIds, setDone } from "../storage.js";
 import { generateSchedule } from "../schedule.js";
 import * as canvas from "../canvas.js";
 import { openTask } from "./taskdetail.js";
 
-function courseHeader(c, opts = {}) {
+const TABS = [
+  { id: "home", label: "Home", icon: "🏠" },
+  { id: "modules", label: "Modules", icon: "📚" },
+  { id: "assignments", label: "Assignments", icon: "📝" },
+  { id: "grades", label: "Grades", icon: "📊" },
+  { id: "files", label: "Files", icon: "📁" },
+];
+
+function courseHeader(c) {
   const hasGrade = c.currentScore != null;
   const spread = hasGrade ? pct(c.currentScore) : "—";
   const delta = hasGrade ? Math.round((c.currentScore - c.targetGrade) * 10) / 10 : null;
@@ -12,135 +20,288 @@ function courseHeader(c, opts = {}) {
   const fill = hasGrade ? Math.max(0, Math.min(100, c.currentScore)) : 0;
   const typeBadge = { ap: "tag-red", honors: "tag-yellow", regular: "tag-green" }[c.type] || "tag-blue";
   return `
-    <div class="course-hero">
-      <div class="hero-main">
-        <div>
-          <h1>${esc(c.name)}</h1>
-          <div class="hero-meta">
-            ${c.code ? `<span class="tag tag-blue">${esc(c.code)}</span>` : ""}
-            <span class="tag ${typeBadge}">${c.type?.toUpperCase() || "REGULAR"}</span>
-            ${c.term ? `<span class="tag tag-purple">${esc(c.term)}</span>` : ""}
-          </div>
+    <header class="course-header">
+      <div class="header-left">
+        <button class="back-btn" id="backToCourses" aria-label="Back to courses">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <span>${esc(c.name)}</span>
+        </button>
+        <div class="course-badges">
+          ${c.code ? `<span class="tag tag-blue">${esc(c.code)}</span>` : ""}
+          <span class="tag ${typeBadge}">${c.type?.toUpperCase() || "REGULAR"}</span>
+          ${c.term ? `<span class="tag tag-purple">${esc(c.term)}</span>` : ""}
         </div>
-        <div class="hero-grade">
-          ${hasGrade ? `
-            <div class="grade-ring" style="--score:${fill}">
+      </div>
+      <div class="header-right">
+        ${hasGrade ? `
+          <div class="grade-summary">
+            <div class="grade-ring" style="--score:${fill}" role="img" aria-label="Current grade ${spread}, target ${c.targetGrade}%">
               <div class="grade-ring-inner">
                 <div class="grade-value">${spread}</div>
-                <div class="grade-target">Target: ${c.targetGrade}%</div>
+                <div class="grade-target">Target ${c.targetGrade}%</div>
               </div>
             </div>
             <div class="grade-delta ${deltaCls}">${delta >= 0 ? "+" : ""}${delta} vs target</div>
-          ` : `<div class="grade-empty"><span class="tag tag-blue">No grade yet</span></div>`}
-        </div>
+          </div>
+        ` : `<div class="grade-empty"><span class="tag tag-blue">No grade yet</span></div>`}
       </div>
-      <div class="hero-progress">
-        <div class="progress-bar"><div class="progress-fill" style="width:${fill}%"></div></div>
-        <div class="progress-labels">
-          <span>Current</span>
-          <span>Target: ${c.targetGrade}%</span>
+    </header>
+  `;
+}
+
+function tabBar(activeTab) {
+  return `
+    <nav class="course-tabs" role="tablist" aria-label="Course sections">
+      ${TABS.map((t) => `
+        <button class="tab-btn ${t.id === activeTab ? "active" : ""}" 
+                role="tab" 
+                aria-selected="${t.id === activeTab}" 
+                data-tab="${t.id}"
+                aria-controls="${t.id}-panel">
+          <span class="tab-icon">${t.icon}</span>
+          <span class="tab-label">${t.label}</span>
+        </button>
+      `).join("")}
+    </nav>
+  `;
+}
+
+function homePanel(course, tasks, done, anns, base) {
+  const courseTasks = tasks.filter((t) => t.courseId === course.id);
+  const open = courseTasks.filter((t) => !t.submitted && !done.has(t.id)).sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));
+  const dueSoon = open.filter((t) => t.dueAt && daysUntil(t.dueAt) !== null && daysUntil(t.dueAt) <= 7).slice(0, 5);
+  const overdue = open.filter((t) => t.dueAt && new Date(t.dueAt) < new Date() && !t.submitted && !done.has(t.id)).slice(0, 5);
+  const courseAnns = (anns || []).filter((a) => a.context_code === `course_${course.id}`).slice(0, 3);
+
+  return `
+    <div class="tab-panel" id="home-panel" role="tabpanel">
+      ${dueSoon.length || overdue.length ? `
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>Upcoming</h2>
+            <a class="btn btn-ghost btn-small" data-tab="assignments">View all</a>
+          </div>
+          <div class="task-list">
+            ${overdue.map((t) => taskRow(t, done, true)).join("")}
+            ${dueSoon.map((t) => taskRow(t, done, false)).join("")}
+            ${!overdue.length && !dueSoon.length ? `<p class="muted">Nothing due soon.</p>` : ""}
+          </div>
+        </section>
+      ` : `<section class="panel-section"><p class="muted">No upcoming work.</p></section>`}
+
+      ${courseAnns.length ? `
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>Recent Announcements</h2>
+            <a class="btn btn-ghost btn-small" data-tab="announcements">View all</a>
+          </div>
+          <div class="ann-list">
+            ${courseAnns.map((a) => {
+              const read = (a.read_state || "read") === "read";
+              const date = a.posted_at ? fmtDate(a.posted_at.split("T")[0]) : "";
+              return `
+                <article class="ann-item ${read ? "read" : ""}" data-id="${esc(a.id)}">
+                  <header class="ann-header">
+                    <span class="ann-dot" aria-label="${read ? "Read" : "Unread"}"></span>
+                    <div class="ann-title-block">
+                      <h4 class="ann-title">${esc(a.title || "Untitled")}</h4>
+                      <div class="ann-meta">${date}</div>
+                    </div>
+                  </header>
+                  <div class="ann-body small muted">${esc((a.message || "").replace(/<[^>]+>/g, "")).slice(0, 150)}</div>
+                  <footer class="ann-footer">
+                    <button class="btn btn-ghost btn-small ann-read" ${read ? "disabled" : ""} data-cid="${course.id}" data-aid="${esc(a.id)}">${read ? "✓ Read" : "Mark read"}</button>
+                  </footer>
+                </article>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      ` : ""}
+
+      <section class="panel-section">
+        <div class="section-head"><h2>Quick Actions</h2></div>
+        <div class="quick-actions">
+          <button class="btn btn-primary add-assignment" data-course="${course.id}"><span>+</span> Add Assignment</button>
+          <button class="btn btn-primary add-test" data-course="${course.id}"><span>+</span> Add Test/Quiz</button>
+          <button class="btn btn-ghost open-syllabus" data-course="${course.id}">View/Edit Syllabus</button>
         </div>
-      </div>
+      </section>
     </div>
   `;
 }
 
-function assignmentsSection(course, tasks, done, isStale) {
+function taskRow(t, doneSet, isOverdue) {
+  const due = t.dueAt ? fmtDate(t.dueAt) : "No due date";
+  const overdue = isOverdue || (t.dueAt && new Date(t.dueAt) < new Date() && !t.submitted && !doneSet.has(t.id));
+  const typeTag = { exam: "tag-red", quiz: "tag-yellow", project: "tag-purple", assignment: "tag-blue" }[t.type] || "tag-blue";
+  return `
+    <div class="task-row ${overdue ? "overdue" : ""}" data-id="${esc(t.id)}">
+      <input type="checkbox" class="done-box" ${doneSet.has(t.id) ? "checked" : ""} title="${doneSet.has(t.id) ? "Un-mark done" : "Mark done"}" aria-label="${doneSet.has(t.id) ? "Un-mark done" : "Mark done"}">
+      <div class="task-info">
+        <div class="task-title">${esc(t.title)}</div>
+        <div class="task-meta">
+          <span class="tag ${typeTag}">${t.type}</span>
+          <span class="due ${overdue ? "overdue" : ""}">${esc(due)}${overdue ? " · OVERDUE" : ""}</span>
+          ${t.pointsPossible ? `<span class="points">${t.pointsPossible} pts</span>` : ""}
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-small task-open" aria-label="Open ${esc(t.title)}">Open</button>
+    </div>
+  `;
+}
+
+function assignmentsPanel(course, tasks, done, isStale) {
   const courseTasks = tasks.filter((t) => t.courseId === course.id);
   const open = courseTasks.filter((t) => !t.submitted && !done.has(t.id)).sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));
   const completed = courseTasks.filter((t) => t.submitted || done.has(t.id)).sort((a, b) => (b.dueAt || "").localeCompare(a.dueAt || ""));
 
-  const openHtml = open.length ? open.map((t) => {
+  const openHtml = open.length ? open.map((t) => taskRow(t, done, false)).join("") : `<p class="muted">No open assignments.</p>`;
+  const doneHtml = completed.length ? completed.map((t) => {
     const due = t.dueAt ? fmtDate(t.dueAt) : "No due date";
-    const overdue = t.dueAt && new Date(t.dueAt) < new Date() && !t.submitted && !done.has(t.id);
     const typeTag = { exam: "tag-red", quiz: "tag-yellow", project: "tag-purple", assignment: "tag-blue" }[t.type] || "tag-blue";
     return `
-      <div class="task-row ${overdue ? "overdue" : ""}" data-id="${esc(t.id)}">
-        <input type="checkbox" class="done-box" ${done.has(t.id) ? "checked" : ""} title="Mark done">
+      <div class="task-row done" data-id="${esc(t.id)}">
+        <input type="checkbox" class="done-box" checked title="Un-mark done" aria-label="Un-mark done">
         <div class="task-info">
           <div class="task-title">${esc(t.title)}</div>
           <div class="task-meta">
             <span class="tag ${typeTag}">${t.type}</span>
-            <span class="due ${overdue ? "overdue" : ""}">${esc(due)}${overdue ? " · OVERDUE" : ""}</span>
+            <span class="due">${esc(due)}</span>
             ${t.pointsPossible ? `<span class="points">${t.pointsPossible} pts</span>` : ""}
+            ${t.submitted ? `<span class="tag tag-green">Submitted</span>` : ""}
           </div>
         </div>
-        <button class="btn btn-ghost btn-small task-open">Open</button>
       </div>
     `;
-  }).join("") : `<p class="muted">No open assignments.</p>`;
+  }).join("") : "";
 
-  const doneHtml = completed.length ? completed.map((t) => `
-    <div class="task-row done" data-id="${esc(t.id)}">
-      <input type="checkbox" class="done-box" checked title="Un-mark done">
-      <div class="task-info">
-        <div class="task-title">${esc(t.title)}</div>
-        <div class="task-meta">
-          <span class="tag tag-blue">${t.type}</span>
-          <span class="due">${t.dueAt ? esc(fmtDate(t.dueAt)) : "No due date"}</span>
-          ${t.pointsPossible ? `<span class="points">${t.pointsPossible} pts</span>` : ""}
-          ${t.submitted ? `<span class="tag tag-green">Submitted</span>` : ""}
+  return `
+    <div class="tab-panel" id="assignments-panel" role="tabpanel">
+      <div class="panel-toolbar">
+        <h2>Assignments</h2>
+        <div class="toolbar-actions">
+          <label class="check"><input type="checkbox" id="showCompleted" ${done.size ? "" : "checked"}> Show completed</label>
+          <button class="btn btn-primary add-assignment" data-course="${course.id}"><span>+</span> Add</button>
+        </div>
+      </div>
+      <div class="task-list" id="openTasks">${openHtml}</div>
+      ${doneHtml ? `<details class="done-fold" id="completedFold"><summary>Completed (${completed.length})</summary><div class="task-list">${doneHtml}</div></details>` : ""}
+    </div>
+  `;
+}
+
+function gradesPanel(course, tasks, done) {
+  const courseTasks = tasks.filter((t) => t.courseId === course.id);
+  const graded = courseTasks.filter((t) => t.pointsEarned !== null && t.pointsPossible > 0);
+  const totalEarned = graded.reduce((s, t) => s + (t.pointsEarned || 0), 0);
+  const totalPossible = graded.reduce((s, t) => s + (t.pointsPossible || 0), 0);
+  const overall = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 1000) / 10 : null;
+  const target = course.targetGrade || 93;
+
+  return `
+    <div class="tab-panel" id="grades-panel" role="tabpanel">
+      <div class="grade-overview">
+        <div class="grade-card">
+          <div class="grade-ring" style="--score:${overall || 0}">
+            <div class="grade-ring-inner">
+              <div class="grade-value">${overall != null ? overall + "%" : "—"}</div>
+              <div class="grade-target">Course grade</div>
+            </div>
+          </div>
+          <div class="grade-details">
+            <div>Target: ${target}%</div>
+            <div class="${overall != null && overall >= target ? "grade-high" : "grade-low"}">
+              ${overall != null ? (overall >= target ? "✓ On track" : "⚠ Below target") : "No graded work yet"}
+            </div>
+          </div>
+        </div>
+        <div class="grade-breakdown">
+          <h3>By Assignment Group</h3>
+          <table class="grade-table">
+            <thead><tr><th>Group</th><th>Earned</th><th>Possible</th><th>%</th></tr></thead>
+            <tbody>
+              ${(() => {
+                const groups = {};
+                courseTasks.forEach((t) => {
+                  const g = t.groupName || "Ungrouped";
+                  if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
+                  if (t.pointsEarned !== null) groups[g].earned += t.pointsEarned;
+                  if (t.pointsPossible > 0) groups[g].possible += t.pointsPossible;
+                });
+                return Object.entries(groups).map(([name, g]) => `
+                  <tr>
+                    <td>${esc(name)}</td>
+                    <td>${g.earned}</td>
+                    <td>${g.possible}</td>
+                    <td>${g.possible > 0 ? Math.round((g.earned / g.possible) * 1000) / 10 + "%" : "—"}</td>
+                  </tr>
+                `).join("");
+              })()}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-  `).join("") : "";
+  `;
+}
+
+function modulesPanel(course, tasks) {
+  const courseTasks = tasks.filter((t) => t.courseId === course.id);
+  const byGroup = {};
+  courseTasks.forEach((t) => {
+    const g = t.groupName || "Ungrouped";
+    if (!byGroup[g]) byGroup[g] = [];
+    byGroup[g].push(t);
+  });
 
   return `
-    <div class="section-card">
-      <div class="section-head">
-        <h2>Assignments</h2>
-        <span class="badge">${open.length} open</span>
-        <button class="btn btn-primary btn-small add-assignment" data-course="${course.id}">+ Add</button>
-      </div>
-      <div class="task-list" data-tab="open">${openHtml}</div>
-      ${doneHtml ? `<details class="done-fold"><summary>Completed (${completed.length})</summary><div class="task-list">${doneHtml}</div></details>` : ""}
+    <div class="tab-panel" id="modules-panel" role="tabpanel">
+      ${Object.entries(byGroup).length ? `
+        ${Object.entries(byGroup).map(([name, items]) => `
+          <section class="module-section">
+            <div class="module-header">
+              <h3>${esc(name)}</h3>
+              <span class="badge">${items.length} items</span>
+            </div>
+            <div class="module-items">
+              ${items.sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || "")).map((t) => `
+                <div class="module-item ${t.type}" data-id="${esc(t.id)}">
+                  <span class="module-icon">${t.type === "exam" ? "📝" : t.type === "quiz" ? "❓" : t.type === "project" ? "📂" : "📄"}</span>
+                  <div class="module-info">
+                    <div class="module-title">${esc(t.title)}</div>
+                    <div class="module-meta">
+                      <span class="tag ${t.type === "exam" ? "tag-red" : t.type === "quiz" ? "tag-yellow" : t.type === "project" ? "tag-purple" : "tag-blue"}">${t.type}</span>
+                      ${t.dueAt ? `<span class="due">${esc(fmtDate(t.dueAt))}</span>` : ""}
+                      ${t.pointsPossible ? `<span class="points">${t.pointsPossible} pts</span>` : ""}
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost btn-small module-open">Open</button>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+        `).join("")}
+      ` : `<p class="muted">No modules found for this course.</p>`}
     </div>
   `;
 }
 
-function announcementsSection(course, anns, base) {
-  const courseAnns = anns.filter((a) => a.context_code === `course_${course.id}`).slice(0, 10);
-  if (!courseAnns.length) return `<div class="section-card"><h2>Announcements</h2><p class="muted">No recent announcements.</p></div>`;
-  return `
-    <div class="section-card">
-      <div class="section-head"><h2>Announcements</h2></div>
-      ${courseAnns.map((a) => {
-        const read = (a.read_state || "read") === "read";
-        const date = a.posted_at ? fmtDate(a.posted_at.split("T")[0]) : "";
-        return `
-          <div class="ann-item ${read ? "read" : ""}" data-id="${esc(a.id)}">
-            <div class="ann-head">
-              <span class="ann-dot" title="${read ? "Read" : "Unread"}"></span>
-              <div class="ann-title">${esc(a.title || "Untitled")}</div>
-              <span class="small muted ann-date">${date}</span>
-            </div>
-            <div class="ann-body small muted">${esc((a.message || "").replace(/<[^>]+>/g, "")).slice(0, 200)}</div>
-            <div class="flex mt">
-              <button class="btn btn-ghost btn-small ann-read" ${read ? "disabled" : ""} data-cid="${course.id}" data-aid="${esc(a.id)}">Mark read</button>
-              ${a.html_url ? `<a class="btn btn-ghost btn-small" href="${esc(a.html_url)}" target="_blank" rel="noopener">Open in Canvas ↗</a>` : ""}
-            </div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
+function filesPanel(course, files) {
+  const courseFiles = (files || []).filter((f) => f._courseId === course.id).sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+  if (!courseFiles.length) return `<div class="tab-panel" id="files-panel" role="tabpanel"><p class="muted">No files found for this course.</p></div>`;
 
-function filesSection(course, files) {
-  const courseFiles = (files || []).filter((f) => f._courseId === course.id).slice(0, 20);
-  if (!courseFiles.length) return `<div class="section-card"><h2>Files</h2><p class="muted">No files found.</p></div>`;
   return `
-    <div class="section-card">
-      <div class="section-head"><h2>Files</h2></div>
+    <div class="tab-panel" id="files-panel" role="tabpanel">
       <div class="file-grid">
         ${courseFiles.map((f) => {
           const k = kindFor(f);
           return `
-            <div class="file-card" data-id="${esc(f.id)}" data-course="${course.id}">
+            <article class="file-card" data-id="${esc(f.id)}" data-course="${course.id}">
               <div class="file-icon">${k.icon}</div>
               <div class="file-name">${esc(f.display_name || f.filename)}</div>
               <div class="file-meta"><span class="tag ${k.cls}">${k.tag}</span> ${f.size ? fmtSize(f.size) : ""}</div>
-            </div>
+            </article>
           `;
         }).join("")}
       </div>
@@ -170,34 +331,26 @@ function fmtSize(n) {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function studyPlanSection(course, tasks) {
-  const courseTasks = tasks.filter((t) => t.courseId === course.id && !t.submitted && t.dueAt);
-  const sched = generateSchedule([course], courseTasks);
-  const today = sched.days[0];
-  if (!today || !today.slots.length) return "";
-  return `
-    <div class="section-card">
-      <div class="section-head"><h2>Study Plan (Next 3 Days)</h2></div>
-      ${sched.days.slice(0, 3).map((d) => `
-        <div class="day-mini">
-          <div class="day-label">${d.label}</div>
-          ${d.slots.map((s) => `
-            <div class="slot-mini ${s.kind === "break" ? "break" : ""}">
-              <span class="time">${s.start}</span>
-              <span class="what">${esc(s.what)}</span>
-              <span class="mins">${s.mins}m</span>
-            </div>
-          `).join("")}
-        </div>
-      `).join("")}
-    </div>
-  `;
+async function loadCourseData(courseId) {
+  let anns = [], files = [], modules = [];
+  try { anns = await canvas.getAnnouncements([`course_${courseId}`]); } catch { anns = []; }
+  try {
+    const fileRes = await canvas.getCourseFiles(courseId);
+    files = (fileRes || []).map((f) => ({ ...f, _courseId: courseId }));
+  } catch { files = []; }
+  try {
+    const modRes = await canvas.getModuleFiles(courseId);
+    modules = modRes || [];
+  } catch { modules = []; }
+  return { anns, files, modules };
 }
 
 export async function render(state, root, isStale) {
   const courseId = state.ui?.courseDetailId;
+  const activeTab = state.ui?.courseDetailTab || "home";
+
   if (!courseId) {
-    root.innerHTML = `<div class="card"><h2>No course selected</h2><p class="muted">Click a course from the Dashboard or Courses tab.</p></div>`;
+    root.innerHTML = `<div class="card"><h2>No course selected</h2><p class="muted">Click a course from the Dashboard.</p></div>`;
     return;
   }
 
@@ -212,80 +365,92 @@ export async function render(state, root, isStale) {
   const allTasks = [...tasks, ...todos.filter((t) => !tasks.some((x) => x.id === t.id))];
   const done = new Set(doneIds());
 
+  // Initial render with loading panels
   root.innerHTML = `
     <div class="course-detail">
-      <button class="back-btn" id="backToCourses" title="Back to courses">← Back</button>
       ${courseHeader(course)}
-      <div class="detail-grid" id="detailGrid">
-        <div class="loading">Loading…</div>
-      </div>
+      ${tabBar(activeTab)}
+      <main class="course-main">
+        <div class="tab-panel loading" id="home-panel" role="tabpanel"><div class="loading-inline">Loading…</div></div>
+        <div class="tab-panel hidden" id="modules-panel" role="tabpanel"></div>
+        <div class="tab-panel hidden" id="assignments-panel" role="tabpanel"></div>
+        <div class="tab-panel hidden" id="grades-panel" role="tabpanel"></div>
+        <div class="tab-panel hidden" id="files-panel" role="tabpanel"></div>
+      </main>
     </div>
   `;
 
-  const grid = root.querySelector("#detailGrid");
-  const backBtn = root.querySelector("#backToCourses");
-  backBtn.addEventListener("click", () => {
+  // Back button
+  root.querySelector("#backToCourses").addEventListener("click", () => {
     state.ui = state.ui || {};
     delete state.ui.courseDetailId;
+    delete state.ui.courseDetailTab;
     state.tab = "dashboard";
-    const event = new CustomEvent("tab-change", { detail: { tab: "dashboard" } });
-    window.dispatchEvent(event);
+    window.dispatchEvent(new CustomEvent("tab-change", { detail: { tab: "dashboard" } }));
   });
 
-  // Load announcements and files in background
-  let anns = [], files = [];
-  try {
-    anns = await canvas.getAnnouncements([`course_${courseId}`]);
-    if (isStale()) return;
-  } catch (e) { anns = []; }
-  try {
-    const fileRes = await canvas.getCourseFiles(courseId);
-    if (isStale()) return;
-    files = (fileRes || []).map((f) => ({ ...f, _courseId: courseId }));
-  } catch (e) { files = []; }
-
-  grid.innerHTML = `
-    ${assignmentsSection(course, allTasks, done, isStale)}
-    ${announcementsSection(course, anns, settings().canvasBaseUrl || "")}
-    ${filesSection(course, files)}
-    ${studyPlanSection(course, allTasks)}
-    <div class="section-card">
-      <div class="section-head"><h2>Quick Actions</h2></div>
-      <div class="quick-actions">
-        <button class="btn btn-primary add-assignment" data-course="${course.id}">+ Add Assignment</button>
-        <button class="btn btn-primary add-test" data-course="${course.id}">+ Add Test/Quiz</button>
-        <button class="btn btn-ghost open-syllabus" data-course="${course.id}">View/Edit Syllabus</button>
-      </div>
-    </div>
-  `;
-
-  // Task checkbox handlers
-  grid.querySelectorAll(".done-box").forEach((cb) => {
-    cb.addEventListener("change", () => {
-      const row = cb.closest(".task-row");
-      const id = row.dataset.id;
-      const newDone = new Set(setDone(id, cb.checked));
-      row.classList.toggle("done", cb.checked);
+  // Tab switching
+  root.querySelectorAll(".course-tabs .tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tabId = btn.dataset.tab;
+      state.ui.courseDetailTab = tabId;
+      root.querySelectorAll(".course-tabs .tab-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.tab === tabId);
+        b.setAttribute("aria-selected", b.dataset.tab === tabId);
+      });
+      root.querySelectorAll(".tab-panel").forEach((p) => {
+        p.classList.toggle("hidden", p.id !== `${tabId}-panel`);
+      });
     });
   });
 
-  // Task open handlers
-  grid.querySelectorAll(".task-open").forEach((btn) => {
+  // Load data and render panels
+  const { anns, files } = await loadCourseData(courseId);
+  if (isStale()) return;
+
+  // Render all panels
+  root.querySelector("#home-panel").innerHTML = homePanel(course, allTasks, done, anns, settings().canvasBaseUrl || "");
+  root.querySelector("#assignments-panel").innerHTML = assignmentsPanel(course, allTasks, done, isStale);
+  root.querySelector("#grades-panel").innerHTML = gradesPanel(course, allTasks, done);
+  root.querySelector("#modules-panel").innerHTML = modulesPanel(course, allTasks);
+  root.querySelector("#files-panel").innerHTML = filesPanel(course, files);
+
+  // Shared handlers for all panels
+  attachSharedHandlers(root, course, allTasks, done, isStale);
+}
+
+function attachSharedHandlers(root, course, allTasks, done, isStale) {
+  // Task checkboxes
+  root.querySelectorAll(".done-box").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const row = cb.closest(".task-row, .module-item");
+      if (!row) return;
+      const id = row.dataset.id;
+      setDone(id, cb.checked);
+      row.classList.toggle("done", cb.checked);
+      row.classList.toggle("overdue", cb.checked === false && row.classList.contains("overdue"));
+    });
+  });
+
+  // Task/module open buttons
+  root.querySelectorAll(".task-open, .module-open").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const row = btn.closest(".task-row");
+      const row = btn.closest(".task-row, .module-item");
+      if (!row) return;
       const task = allTasks.find((t) => t.id === row.dataset.id);
-      if (task) openTask(task, state);
+      if (task) openTask(task, { ...state, data: { ...state.data, tasks: allTasks } });
     });
   });
 
   // Announcement mark-read
-  grid.querySelectorAll(".ann-read").forEach((btn) => {
+  root.querySelectorAll(".ann-read").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const cid = +btn.dataset.cid;
       const aid = btn.dataset.aid;
       try {
         await canvas.markAnnouncementRead(cid, aid);
         btn.disabled = true;
+        btn.textContent = "✓ Read";
         btn.closest(".ann-item").classList.add("read");
         toast("Marked as read.");
       } catch (e) {
@@ -294,14 +459,14 @@ export async function render(state, root, isStale) {
     });
   });
 
-  // Add assignment/test buttons
-  grid.querySelectorAll(".add-assignment").forEach((btn) => {
-    btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, state, false));
+  // Add assignment/test
+  root.querySelectorAll(".add-assignment").forEach((btn) => {
+    btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, { ...state, data: { ...state.data, tasks: allTasks } }, false));
   });
-  grid.querySelectorAll(".add-test").forEach((btn) => {
-    btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, state, true));
+  root.querySelectorAll(".add-test").forEach((btn) => {
+    btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, { ...state, data: { ...state.data, tasks: allTasks } }, true));
   });
-  grid.querySelector(".open-syllabus")?.addEventListener("click", () => openSyllabusModal(course, state));
+  root.querySelector(".open-syllabus")?.addEventListener("click", () => openSyllabusModal(course, state));
 }
 
 function openAddAssignmentModal(courseId, state, isTest) {

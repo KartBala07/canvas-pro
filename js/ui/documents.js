@@ -69,30 +69,45 @@ async function openFile(f) {
     ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("#prevClose")) closePreview(); });
   };
 
-  // 1) Preferred: CanvaDoc preview session
-  let canvasDocUrl = f.canvadoc_session_url;
-  if (!canvasDocUrl && cid && fid) {
+  const showLoading = (msg) => {
+    show(`<div class="loading" style="padding:40px;text-align:center"><div class="spinner"></div><p class="muted small">${esc(msg)}</p></div>`);
+  };
+
+  showLoading("Loading preview…");
+
+  // 1) Get full file metadata if we don't have canvadoc_session_url
+  let fileMeta = f;
+  if (!f.canvadoc_session_url && cid && fid) {
     try {
-      const meta = await canvas.getFile(cid, fid);
-      if (meta && meta.canvadoc_session_url) canvasDocUrl = meta.canvadoc_session_url;
-    } catch (e) {}
+      fileMeta = await canvas.getFile(cid, fid);
+    } catch (e) {
+      console.warn("Could not fetch file metadata:", e);
+    }
   }
+
+  // 2) Try CanvaDoc preview session (Canvas's native viewer)
+  const canvasDocUrl = fileMeta.canvadoc_session_url;
   if (canvasDocUrl) {
+    showLoading("Starting Canvas preview…");
     try {
       const sessionUrl = await canvas.getCanvadocSession(canvasDocUrl);
       if (sessionUrl) {
-        show(`<iframe src="${esc(sessionUrl)}" allowfullscreen style="width:100%;height:68vh;border:none;border-radius:12px;background:#fff"></iframe>
+        show(`<iframe src="${esc(sessionUrl)}" allowfullscreen style="width:100%;height:70vh;border:none;border-radius:12px;background:#fff"></iframe>
           <p class="small muted" style="margin-top:8px">Preview via Canvas (CanvaDoc). If blank, use ↗ to open in Canvas.</p>`);
         return;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("CanvaDoc preview failed:", e);
+    }
   }
 
-  // 2) Fallback: direct fetch for supported types
-  const k = kindFor(f);
+  // 3) Try direct file fetch for supported preview types
+  const k = kindFor(fileMeta);
   if (k.preview) {
+    showLoading("Fetching file…");
     try {
-      const res = await fetch("/api/dl?u=" + encodeURIComponent(canvas.fileDownloadUrl(base, cid, fid)), {
+      const downloadUrl = canvas.fileDownloadUrl(base, cid, fid);
+      const res = await fetch("/api/dl?u=" + encodeURIComponent(downloadUrl), {
         headers: { "X-Canvas-Token": s.token, "X-Canvas-Base": base },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -106,12 +121,28 @@ async function openFile(f) {
       }
       return;
     } catch (e) {
-      // fall through to error
+      console.warn("Direct fetch failed:", e);
+      // fall through
     }
   }
 
-  // 3) Unsupported or error
-  show(`<p class="muted">"${esc(f.display_name || f.filename)}" preview not available.</p>`,
+  // 4) Fallback: Embed Canvas preview page in iframe (may work for some file types)
+  if (k.preview === "pdf" || k.preview === "image") {
+    showLoading("Trying embedded Canvas preview…");
+    try {
+      // Try the Canvas preview URL directly
+      const previewUrl = `${base}/courses/${cid}/files/${fid}/preview`;
+      show(`<iframe src="${esc(previewUrl)}" style="width:100%;height:70vh;border:none;border-radius:12px;background:#fff" title="Canvas Preview"></iframe>
+        <p class="small muted" style="margin-top:8px">Embedded Canvas preview. If blank, use ↗ to open in Canvas.</p>`);
+      return;
+    } catch (e) {
+      console.warn("Embedded preview failed:", e);
+    }
+  }
+
+  // 5) Final fallback
+  show(`<p class="muted">"${esc(fileMeta.display_name || fileMeta.filename)}" preview not available in-app.</p>
+    <p class="small muted" style="margin-top:8px">This file type (${esc(fileMeta.content_type || fileMeta.mime_class || "unknown")}) can't be previewed directly. Use the button below to open in Canvas.</p>`,
     `<a class="btn" href="${esc(onCanvas)}" target="_blank" rel="noopener">Open in Canvas ↗</a>`);
 }
 

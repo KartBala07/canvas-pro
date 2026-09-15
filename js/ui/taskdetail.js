@@ -2,6 +2,7 @@ import { esc, fmtDate, daysUntil, toast } from "../utils.js";
 import * as canvas from "../canvas.js";
 import { rawEstimate } from "../schedule.js";
 import { timeLogs, logTime } from "../storage.js";
+import { openSubmissionModal } from "./submissionModal.js";
 
 let open = false;
 
@@ -19,7 +20,7 @@ export async function openTask(task, state) {
   const wrap = document.createElement("div");
   wrap.className = "modal-overlay hidden";
   wrap.innerHTML = `
-    <div class="modal">
+    <div class="modal modal-wide">
       <div class="modal-head">
         <h2>${esc(task.title)}</h2>
         <button class="btn btn-small btn-ghost" data-close>✕</button>
@@ -33,6 +34,7 @@ export async function openTask(task, state) {
         <span class="tag ${task.type === "exam" ? "tag-red" : task.type === "quiz" ? "tag-yellow" : task.type === "project" ? "tag-purple" : "tag-blue"}">${esc(task.type)}</span>
         <span class="tag ${task.submitted ? "tag-green" : "tag-yellow"}">${task.submitted ? "Submitted" : "Not submitted"}</span>
       </div>
+      ${!task.submitted ? `<button class="btn btn-primary submit-btn" data-submit>Submit Assignment</button>` : ""}
       <div class="effort">
         <div class="flex between" style="align-items:baseline">
           <span class="small muted">Effort tracker · actually been studying it?</span>
@@ -99,5 +101,11 @@ export async function openTask(task, state) {
       const box = wrap.querySelector(".desc");
       if (box) box.innerHTML = "<p class='muted'>Could not load the description (offline or token issue).</p>";
     }
+  }
+
+  // Submit button handler
+  const submitBtn = wrap.querySelector("[data-submit]");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", () => openSubmissionModal(task, state, close));
   }
 }
