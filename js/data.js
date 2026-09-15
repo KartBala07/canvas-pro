@@ -164,6 +164,19 @@ export async function loadAll(onStage) {
     if (cached && Date.now() - cached.at < SUB_CACHE_TTL) return cached.data;
     try {
       const data = await canvas.getStudentSubmissions(c.id);
+      // Some tokens can't read the grouped students/submissions endpoint but CAN
+      // read assignments?include[]=submission — fall back before giving up.
+      if (!(data && (data.submissions || []).length)) {
+        try {
+          const assign = await canvas.getAssignmentsWithSubmissions(c.id);
+          const subs = assign
+            .filter((a) => a.submission)
+            .map((a) => ({ ...a.submission, assignment_id: a.id }));
+          if (subs.length) data.submissions = subs;
+        } catch (e2) {
+          console.warn("Assignments-submission fallback failed for " + c.name, e2);
+        }
+      }
       if (data && (data.submissions || []).length) cacheSet(key, { at: Date.now(), data });
       return data;
     } catch (e) {

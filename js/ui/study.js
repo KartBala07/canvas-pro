@@ -1,6 +1,7 @@
 import { esc } from "../utils.js";
 import { generateSchedule, scheduleSummary, courseFactors } from "../schedule.js";
 import { settings, saveSettings, doneIds, timeLogs } from "../storage.js";
+import { openTask } from "./taskdetail.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data;
@@ -19,13 +20,16 @@ export function render(state, root) {
     <div class="card day-card">
       <div class="flex between">
         <h3>${d.label}</h3>
-        <span class="muted small">${d.used || 0} / ${d.available} min planned</span>
+        <span class="small muted">${d.used || 0} / ${d.available} min planned</span>
       </div>
+      <div class="used-bar"><div class="used-fill" style="width:${d.available ? Math.round((d.used / d.available) * 100) : 0}%"></div></div>
       ${d.slots.length ? d.slots.map((sl) => {
         const loggedMins = logs[sl.taskId]?.mins;
+        const attrs = sl.taskId ? `data-task="${esc(sl.taskId)}" role="button" tabindex="0" title="Open assignment"` : "";
+        const cls = "slot clickable" + " " + (sl.kind === "break" ? "break" : sl.kind === "study" ? "study" : "work");
         return `
-        <div class="slot ${sl.kind === "break" ? "break" : ""}">
-          <span class="time">${sl.start}</span>
+        <div class="${cls}" ${attrs}>
+          <span class="time">${sl.start}${sl.end ? "–" + sl.end : ""}</span>
           <div class="what"><div>${esc(sl.what)}</div><div class="small muted">${esc(sl.labels)}${loggedMins ? ` · spent ${loggedMins}m` : ""}</div></div>
           <span class="mins">${sl.mins}m</span>
         </div>`;
@@ -65,14 +69,14 @@ export function render(state, root) {
           <div class="flex between" style="margin-bottom:8px">
             <span class="small muted">Study window</span>
             <span class="flex">
-              <input id="winStart" type="time" value="${s0.start}" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+              <input id="winStart" type="time" value="${s0.start}" class="time-input" />
               <span class="muted">–</span>
-              <input id="winEnd" type="time" value="${s0.end}" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+              <input id="winEnd" type="time" value="${s0.end}" class="time-input" />
             </span>
           </div>
           <label class="row" style="margin-bottom:6px">
             <span class="small muted" style="flex:1">Daily max (min)</span>
-            <input id="dailyMax" type="number" min="30" max="600" step="15" value="${s.maxStudyMinutesPerDay}" style="width:90px;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+            <input id="dailyMax" type="number" min="30" max="600" step="15" value="${s.maxStudyMinutesPerDay}" class="time-input" style="width:90px" />
           </label>
           <label class="row" style="margin-bottom:12px">
             <span class="small muted" style="flex:1">Minutes per point <b id="mppVal">${s.baseMinutesPerPoint}</b></span>
@@ -81,11 +85,11 @@ export function render(state, root) {
           <div class="flex" style="gap:10px;margin-bottom:12px">
             <label class="col" style="flex:1">
               <span class="small muted">Break every (min)</span>
-              <input id="breakEvery" type="number" min="0" max="120" step="5" value="${s.breakEveryMinutes}" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+              <input id="breakEvery" type="number" min="0" max="120" step="5" value="${s.breakEveryMinutes}" style="width:100%" class="time-input" />
             </label>
             <label class="col" style="flex:1">
               <span class="small muted">Break length (min) · 0 = off</span>
-              <input id="breakLen" type="number" min="0" max="60" step="5" value="${s.breakMinutes}" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)" />
+              <input id="breakLen" type="number" min="0" max="60" step="5" value="${s.breakMinutes}" style="width:100%" class="time-input" />
             </label>
           </div>
           <button id="saveStudy" class="btn btn-primary">Save &amp; regenerate</button>
@@ -123,5 +127,22 @@ export function render(state, root) {
       else delete st.difficultyOverrides[sel.dataset.course];
       saveSettings();
     });
+  });
+
+  // Click a planned slot to open the assignment right here.
+  const openFromSlot = (id) => {
+    const t = merged.find((x) => x.id === id);
+    if (t) openTask(t, state);
+  };
+  root.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-task]");
+    if (el) openFromSlot(el.dataset.task);
+  });
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest && e.target.closest("[data-task]");
+    if (!el) return;
+    e.preventDefault();
+    openFromSlot(el.dataset.task);
   });
 }

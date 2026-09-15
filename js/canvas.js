@@ -105,13 +105,15 @@ export function getAssignmentGroups(courseId) {
 // All of the current user's submissions for a course — the canonical source of
 // "did I get a grade" that works even when the group include is scope-limited.
 // grouped=1 returns { assignments: [], submissions: [{ assignment_id, score, workflow_state }] }.
-// Pages through every result so a large course never misses grades.
 export async function getStudentSubmissions(courseId) {
   const out = { assignments: [], submissions: [] };
-  let path = `/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&grouped=1`;
-  while (path) {
-    const r = buildRequest(path);
-    const res = await fetch(r.url, { headers: r.headers });
+  let url;
+  {
+    const r = buildRequest(`/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&grouped=1`);
+    url = r.url;
+  }
+  while (url) {
+    const res = await fetch(url, { headers: { "X-Canvas-Token": token, "X-Canvas-Base": base } });
     if (!res.ok) {
       let msg = errorFrom(res, res.status);
       try {
@@ -127,9 +129,16 @@ export async function getStudentSubmissions(courseId) {
     }
     const link = res.headers.get("Link") || "";
     const m = /<([^>]+)>;\s*rel="next"/.exec(link);
-    path = m ? m[1] : null;
+    url = m ? m[1] : null;
   }
   return out;
+}
+
+// Fallback source of posted grades: every assignment with the student's own
+// submission included. Helps when the grouped students/submissions endpoint is
+// scope-limited for the token.
+export function getAssignmentsWithSubmissions(courseId) {
+  return all(`/api/v1/courses/${courseId}/assignments?include[]=submission`);
 }
 
 // Generic write helper for the canvas proxy (submit work, upload preflight…).

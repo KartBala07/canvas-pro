@@ -262,7 +262,7 @@ function gradesPanel(course, tasks, whatIf) {
   const deltaCls = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
 
   const rows = sorted.map((t) => {
-    const gradedRow = t.pointsEarned != null && t.pointsPossible > 0;
+    const gradedRow = t.pointsEarned != null;
     const possible = t.pointsPossible || 0;
     const actual = gradedRow ? t.pointsEarned : null;
     const override = whatIf[t.id];

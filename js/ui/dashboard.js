@@ -2,6 +2,7 @@ import { fmtDate, pct, esc, daysUntil } from "../utils.js";
 import { recommendedOrder } from "../priorities.js";
 import { generateSchedule } from "../schedule.js";
 import { doneIds } from "../storage.js";
+import { openTask } from "./taskdetail.js";
 
 export function render(state, root) {
   const { courses, tasks, todos } = state.data || { courses: [], tasks: [], todos: [] };
@@ -60,8 +61,8 @@ const courseCards = courses.map((c) => {
   const sched = generateSchedule(courses, open);
   const todayPlan = sched.days[0];
   const todayRows = todayPlan.slots.map((s) => `
-    <div class="slot">
-      <span class="time">${s.start}</span>
+    <div class="slot${s.taskId ? " clickable" : ""} ${s.kind === "break" ? "break" : s.kind === "study" ? "study" : "work"}"${s.taskId ? ` data-task="${esc(s.taskId)}" role="button" tabindex="0" title="Open assignment"` : ""}>
+      <span class="time">${s.start}${s.end ? "–" + s.end : ""}</span>
       <div class="what"><div>${esc(s.what)}</div><div class="small muted">${esc(s.labels)}</div></div>
       <span class="mins">${s.mins}m</span>
     </div>`).join("") || `<p class="muted">No study time scheduled. Adjust Settings → Study Time.</p>`;
@@ -92,5 +93,21 @@ const courseCards = courses.map((c) => {
       const event = new CustomEvent("tab-change", { detail: { tab: "courseDetail", courseId } });
       window.dispatchEvent(event);
     });
+  });
+
+  // Nightly plan: click a slot to open that assignment.
+  root.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-task]");
+    if (!el) return;
+    const t = merged.find((x) => x.id === el.dataset.task);
+    if (t) openTask(t, state);
+  });
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest && e.target.closest("[data-task]");
+    if (!el) return;
+    e.preventDefault();
+    const t = merged.find((x) => x.id === el.dataset.task);
+    if (t) openTask(t, state);
   });
 }

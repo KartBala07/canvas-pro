@@ -308,7 +308,12 @@ async function init() {
       setSync("Loaded offline · refreshing…", "");
       // Auto-sync in the background: the cached view is instant, then grades /
       // to-dos update when the fresh data lands.
-      setTimeout(() => fetchAll().catch(() => setSync("Sync failed", "err")), 350);
+      setTimeout(() => {
+        fetchAll().catch((e) => {
+          setSync("Sync failed", "err");
+          toast("Auto-sync failed: " + (e?.message || e), "err");
+        });
+      }, 350);
     } else if (!(await connectAndLoad())) {
       // Couldn't reconnect; keep the connect screen visible with the error.
     } else {
