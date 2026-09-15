@@ -942,6 +942,21 @@ tr.done td:first-child { text-decoration: none; }
 /* Download/upload */
 .drop-zone.dragover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
+/* ---------- What-if grade calculator ---------- */
+.grade-ring.large { width: 96px; height: 96px; }
+.grade-ring.large .grade-ring-inner { width: 70px; height: 70px; }
+.gwi-input {
+  width: 96px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
+  font: inherit; font-size: 13px; text-align: right;
+  transition: border-color .15s, box-shadow .15s;
+}
+.gwi-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.gwi-input::placeholder { color: var(--muted); }
+tr.gwi-ungraded td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+tr.gwi-ungraded .gwi-input { border-style: dashed; }
+#gwiStatus { font-size: 12px; }
+
 /* ---------- Task detail modal ---------- */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 300;

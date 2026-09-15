@@ -160,7 +160,9 @@ function bindEvents() {
   // Event delegation: works even if a node is replaced or a direct binding
   // was set up under an error, and catches clicks on children.
   document.addEventListener("click", (e) => {
-    const tab = e.target.closest && e.target.closest(".tab-btn");
+    // Only the sidebar's own tab buttons trigger global navigation. Course
+    // detail tabs (`.course-tabs .tab-btn`) manage their own panels.
+    const tab = e.target.closest && e.target.closest(".sidebar .tab-btn");
     if (tab) {
       switchTab(tab);
       return;
@@ -177,7 +179,7 @@ function bindEvents() {
       return;
     }
     if (e.target.closest && e.target.closest("#userBtn")) {
-      switchTab(document.querySelector('.tab-btn[data-tab="settings"]'));
+      switchTab(document.querySelector('.sidebar .tab-btn[data-tab="settings"]'));
     }
   });
 
@@ -195,7 +197,7 @@ function bindEvents() {
 function switchTab(btn) {
   if (!btn) return;
   try {
-    $$(".tab-btn").forEach((b) => b.classList.remove("active"));
+    $$(".sidebar .tab-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     state.tab = btn.dataset.tab;
     renderTab(state.tab);

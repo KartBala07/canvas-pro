@@ -66,6 +66,19 @@ function tabBar(activeTab) {
   `;
 }
 
+// Switch which course tab panel is visible. Used by the tab bar AND by
+// "View all" quick links so browsing stays inside the course.
+function switchCourseTab(root, tabId) {
+  if (!TABS.some((t) => t.id === tabId)) return;
+  root.querySelectorAll(".course-tabs .tab-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tabId);
+    b.setAttribute("aria-selected", b.dataset.tab === tabId);
+  });
+  root.querySelectorAll(".tab-panel").forEach((p) => {
+    p.classList.toggle("hidden", p.id !== `${tabId}-panel`);
+  });
+}
+
 function homePanel(course, tasks, done, anns, base) {
   const courseTasks = tasks.filter((t) => t.courseId === course.id);
   const open = courseTasks.filter((t) => !t.submitted && !done.has(t.id)).sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));
@@ -79,7 +92,7 @@ function homePanel(course, tasks, done, anns, base) {
         <section class="panel-section">
           <div class="section-head">
             <h2>Upcoming</h2>
-            <a class="btn btn-ghost btn-small" data-tab="assignments">View all</a>
+            <a class="btn btn-ghost btn-small" data-goto="assignments">View all</a>
           </div>
           <div class="task-list">
             ${overdue.map((t) => taskRow(t, done, true)).join("")}
@@ -93,7 +106,7 @@ function homePanel(course, tasks, done, anns, base) {
         <section class="panel-section">
           <div class="section-head">
             <h2>Recent Announcements</h2>
-            <a class="btn btn-ghost btn-small" data-tab="announcements">View all</a>
+            <a class="btn btn-ghost btn-small" data-goto="announcements">View all</a>
           </div>
           <div class="ann-list">
             ${courseAnns.map((a) => {
@@ -191,56 +204,140 @@ function assignmentsPanel(course, tasks, done, isStale) {
   `;
 }
 
-function gradesPanel(course, tasks, done) {
+// Standard letter cutoffs, used only for the projected "what-if" letter.
+function letterFromPct(p) {
+  if (p == null || Number.isNaN(p)) return null;
+  if (p >= 93) return "A";
+  if (p >= 90) return "A-";
+  if (p >= 87) return "B+";
+  if (p >= 83) return "B";
+  if (p >= 80) return "B-";
+  if (p >= 77) return "C+";
+  if (p >= 73) return "C";
+  if (p >= 70) return "C-";
+  if (p >= 67) return "D+";
+  if (p >= 63) return "D";
+  if (p >= 60) return "D-";
+  return "F";
+}
+
+// Effective points-earned view for a task under what-if overrides:
+// explicit override wins, else the real grade if present, else null (excluded).
+function effectiveEarned(t, whatIf) {
+  const w = whatIf[t.id];
+  if (w != null) return Math.max(0, +w || 0);
+  if (t.pointsEarned != null) return Math.max(0, t.pointsEarned || 0);
+  return null;
+}
+
+function projectedTotal(courseTasks, whatIf) {
+  let earned = 0, possible = 0, included = 0, excluded = 0;
+  for (const t of courseTasks) {
+    const p = t.pointsPossible || 0;
+    if (!p) continue;
+    const e = effectiveEarned(t, whatIf);
+    if (e == null) { excluded++; continue; }
+    earned += e;
+    possible += p;
+    included++;
+  }
+  return {
+    pct: possible > 0 ? Math.round((earned / possible) * 1000) / 10 : null,
+    earned, possible, included, excluded,
+  };
+}
+
+function gradesPanel(course, tasks, whatIf) {
   const courseTasks = tasks.filter((t) => t.courseId === course.id);
-  const graded = courseTasks.filter((t) => t.pointsEarned !== null && t.pointsPossible > 0);
-  const totalEarned = graded.reduce((s, t) => s + (t.pointsEarned || 0), 0);
-  const totalPossible = graded.reduce((s, t) => s + (t.pointsPossible || 0), 0);
-  const overall = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 1000) / 10 : null;
+  const sorted = [...courseTasks].sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));
+  const actualTasks = courseTasks.filter((t) => t.pointsEarned != null && t.pointsPossible > 0);
+  const actualPct = (() => {
+    const poss = actualTasks.reduce((s, t) => s + (t.pointsPossible || 0), 0);
+    return poss > 0 ? Math.round((actualTasks.reduce((s, t) => s + (t.pointsEarned || 0), 0) / poss) * 1000) / 10 : null;
+  })();
+  const proj = projectedTotal(courseTasks, whatIf);
   const target = course.targetGrade || 93;
+  const fill = Math.max(0, Math.min(100, proj.pct || 0));
+  const delta = proj.pct != null ? Math.round((proj.pct - target) * 10) / 10 : null;
+  const deltaCls = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
+
+  const rows = sorted.map((t) => {
+    const gradedRow = t.pointsEarned != null && t.pointsPossible > 0;
+    const possible = t.pointsPossible || 0;
+    const actual = gradedRow ? t.pointsEarned : null;
+    const override = whatIf[t.id];
+    const value = override != null ? override : (actual != null ? actual : "");
+    return `
+      <tr class="${gradedRow ? "" : "gwi-ungraded"}">
+        <td><b>${esc(t.title)}</b> ${t.submitted && !gradedRow ? `<span class="tag tag-yellow small">Submitted</span>` : ""}</td>
+        <td class="small muted">${esc(t.groupName || (t.type === "exam" ? "Test" : "Assignment"))}</td>
+        <td>${possible ? possible : "—"}</td>
+        <td>${actual != null ? `${actual} <span class="small muted">/ ${possible}</span>` : '<span class="small muted">Not graded</span>'}</td>
+        <td><input class="gwi-input" type="number" min="0" max="${possible || ""}" step="any" inputmode="decimal"
+              data-id="${esc(t.id)}" data-possible="${possible || ""}" data-actual="${actual ?? ""}"
+              value="${value}" placeholder="${gradedRow ? "override" : "what if…"}" aria-label="What-if grade for ${esc(t.title)}"></td>
+      </tr>`;
+  }).join("");
+
+  const groupRows = (() => {
+    const groups = {};
+    courseTasks.forEach((t) => {
+      const g = t.groupName || "Ungrouped";
+      const p = t.pointsPossible || 0;
+      const e = effectiveEarned(t, whatIf);
+      if (!p || e == null) return;
+      if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
+      groups[g].earned += e;
+      groups[g].possible += p;
+    });
+    return Object.entries(groups).map(([name, g]) => `
+      <tr>
+        <td>${esc(name)}</td>
+        <td>${Math.round(g.earned * 100) / 100}</td>
+        <td>${g.possible}</td>
+        <td>${Math.round((g.earned / g.possible) * 1000) / 10 + "%"}</td>
+      </tr>`).join("");
+  })();
 
   return `
     <div class="tab-panel" id="grades-panel" role="tabpanel">
+      <div class="panel-toolbar">
+        <h2>Grades — what-if calculator</h2>
+        <div class="toolbar-actions">
+          <span class="small muted" id="gwiStatus">${proj.excluded ? `Excludes ${proj.excluded} ungraded (enter points to include)` : ""}</span>
+          <button class="btn btn-ghost btn-small" id="resetWhatIf">Reset</button>
+        </div>
+      </div>
+
       <div class="grade-overview">
         <div class="grade-card">
-          <div class="grade-ring" style="--score:${overall || 0}">
+          <div class="grade-ring large" id="gwiRing" style="--score:${fill}" role="img" aria-label="Projected grade">
             <div class="grade-ring-inner">
-              <div class="grade-value">${overall != null ? overall + "%" : "—"}</div>
-              <div class="grade-target">Course grade</div>
+              <div class="grade-value" id="gwiPct">${proj.pct != null ? proj.pct + "%" : "—"}</div>
+              <div class="grade-target">Projected</div>
             </div>
           </div>
           <div class="grade-details">
-            <div>Target: ${target}%</div>
-            <div class="${overall != null && overall >= target ? "grade-high" : "grade-low"}">
-              ${overall != null ? (overall >= target ? "✓ On track" : "⚠ Below target") : "No graded work yet"}
-            </div>
+            <div id="gwiLetter">Letter ${esc(letterFromPct(proj.pct) || "—")}</div>
+            <div>Actual: ${actualPct != null ? actualPct + "%" : "—"}</div>
+            <div id="gwiDelta" class="${deltaCls}">${delta != null ? (delta >= 0 ? "✓ +" + delta : "⚠ " + delta) + " vs " + target + "% target" : "No graded work yet"}</div>
           </div>
         </div>
         <div class="grade-breakdown">
-          <h3>By Assignment Group</h3>
+          <h3>By Assignment Group <span class="small muted">(point-based, incl. what-if)</span></h3>
           <table class="grade-table">
             <thead><tr><th>Group</th><th>Earned</th><th>Possible</th><th>%</th></tr></thead>
-            <tbody>
-              ${(() => {
-                const groups = {};
-                courseTasks.forEach((t) => {
-                  const g = t.groupName || "Ungrouped";
-                  if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
-                  if (t.pointsEarned !== null) groups[g].earned += t.pointsEarned;
-                  if (t.pointsPossible > 0) groups[g].possible += t.pointsPossible;
-                });
-                return Object.entries(groups).map(([name, g]) => `
-                  <tr>
-                    <td>${esc(name)}</td>
-                    <td>${g.earned}</td>
-                    <td>${g.possible}</td>
-                    <td>${g.possible > 0 ? Math.round((g.earned / g.possible) * 1000) / 10 + "%" : "—"}</td>
-                  </tr>
-                `).join("");
-              })()}
-            </tbody>
+            <tbody id="gwiGroups">${groupRows}</tbody>
           </table>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="small muted mb">Type points into the last column for any assignment — graded or not — to test how the course grade changes. Blank = fall back to the real grade (or leave ungraded out).</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Assignment</th><th>Group</th><th>Possible</th><th>Earned</th><th>What-if points</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
       </div>
     </div>
   `;
@@ -392,15 +489,22 @@ export async function render(state, root, isStale) {
   // Tab switching
   root.querySelectorAll(".course-tabs .tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const tabId = btn.dataset.tab;
-      state.ui.courseDetailTab = tabId;
-      root.querySelectorAll(".course-tabs .tab-btn").forEach((b) => {
-        b.classList.toggle("active", b.dataset.tab === tabId);
-        b.setAttribute("aria-selected", b.dataset.tab === tabId);
-      });
-      root.querySelectorAll(".tab-panel").forEach((p) => {
-        p.classList.toggle("hidden", p.id !== `${tabId}-panel`);
-      });
+      state.ui.courseDetailTab = btn.dataset.tab;
+      switchCourseTab(root, btn.dataset.tab);
+    });
+  });
+
+  // "View all" quick links: course tabs stay in-course, global tabs navigate.
+  root.querySelectorAll("[data-goto]").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const goto = a.dataset.goto;
+      if (TABS.some((t) => t.id === goto)) {
+        state.ui.courseDetailTab = goto;
+        switchCourseTab(root, goto);
+      } else {
+        document.querySelector(`.sidebar .tab-btn[data-tab="${goto}"]`)?.click();
+      }
     });
   });
 
@@ -408,18 +512,20 @@ export async function render(state, root, isStale) {
   const { anns, files } = await loadCourseData(courseId);
   if (isStale()) return;
 
+  const whatIf = state.ui?.whatIf?.[course.id] || {};
+
   // Render all panels
   root.querySelector("#home-panel").innerHTML = homePanel(course, allTasks, done, anns, settings().canvasBaseUrl || "");
   root.querySelector("#assignments-panel").innerHTML = assignmentsPanel(course, allTasks, done, isStale);
-  root.querySelector("#grades-panel").innerHTML = gradesPanel(course, allTasks, done);
+  root.querySelector("#grades-panel").innerHTML = gradesPanel(course, allTasks, whatIf);
   root.querySelector("#modules-panel").innerHTML = modulesPanel(course, allTasks);
   root.querySelector("#files-panel").innerHTML = filesPanel(course, files);
 
   // Shared handlers for all panels
-  attachSharedHandlers(root, course, allTasks, done, isStale);
+  attachSharedHandlers(root, state, course, allTasks, done, isStale);
 }
 
-function attachSharedHandlers(root, course, allTasks, done, isStale) {
+function attachSharedHandlers(root, state, course, allTasks, done, isStale) {
   // Task checkboxes
   root.querySelectorAll(".done-box").forEach((cb) => {
     cb.addEventListener("change", () => {
@@ -467,6 +573,75 @@ function attachSharedHandlers(root, course, allTasks, done, isStale) {
     btn.addEventListener("click", () => openAddAssignmentModal(+btn.dataset.course, { ...state, data: { ...state.data, tasks: allTasks } }, true));
   });
   root.querySelector(".open-syllabus")?.addEventListener("click", () => openSyllabusModal(course, state));
+
+  // What-if grade calculator on the Grades tab
+  const gwi = root.querySelector("#grades-panel");
+  if (gwi) {
+    const recalc = () => {
+      const whatIf = {};
+      gwi.querySelectorAll(".gwi-input").forEach((inp) => {
+        if (inp.value.trim() === "") return;
+        let v = +inp.value;
+        if (Number.isNaN(v)) return;
+        const max = +inp.dataset.possible;
+        if (Number.isFinite(max) && max > 0) v = Math.min(v, max);
+        whatIf[inp.dataset.id] = Math.max(0, v);
+      });
+      state.ui.whatIf = state.ui.whatIf || {};
+      state.ui.whatIf[course.id] = whatIf;
+
+      const courseTasks = allTasks.filter((t) => t.courseId === course.id);
+      const proj = projectedTotal(courseTasks, whatIf);
+      const target = course.targetGrade || 93;
+      const delta = proj.pct != null ? Math.round((proj.pct - target) * 10) / 10 : null;
+      const ring = gwi.querySelector("#gwiRing");
+      const pctEl = gwi.querySelector("#gwiPct");
+      const letterEl = gwi.querySelector("#gwiLetter");
+      const deltaEl = gwi.querySelector("#gwiDelta");
+      const statusEl = gwi.querySelector("#gwiStatus");
+
+      if (ring) ring.style.setProperty("--score", Math.max(0, Math.min(100, proj.pct || 0)));
+      if (pctEl) pctEl.textContent = proj.pct != null ? proj.pct + "%" : "—";
+      if (letterEl) letterEl.textContent = "Letter " + (letterFromPct(proj.pct) || "—");
+      if (deltaEl) {
+        deltaEl.textContent = delta != null ? (delta >= 0 ? "✓ +" + delta : "⚠ " + delta) + " vs " + target + "% target" : "No graded work yet";
+        deltaEl.className = delta == null ? "" : delta >= 0 ? "grade-high" : "grade-low";
+      }
+      if (statusEl) statusEl.textContent = proj.excluded ? `Excludes ${proj.excluded} ungraded (enter points to include)` : "";
+
+      // Rebuild the group table
+      const tbody = gwi.querySelector("#gwiGroups");
+      if (tbody) {
+        const groups = {};
+        courseTasks.forEach((t) => {
+          const g = t.groupName || "Ungrouped";
+          const p = t.pointsPossible || 0;
+          const e = effectiveEarned(t, whatIf);
+          if (!p || e == null) return;
+          if (!groups[g]) groups[g] = { earned: 0, possible: 0 };
+          groups[g].earned += e;
+          groups[g].possible += p;
+        });
+        tbody.innerHTML = Object.entries(groups).map(([name, g]) => `
+          <tr>
+            <td>${esc(name)}</td>
+            <td>${Math.round(g.earned * 100) / 100}</td>
+            <td>${g.possible}</td>
+            <td>${Math.round((g.earned / g.possible) * 1000) / 10 + "%"}</td>
+          </tr>`).join("");
+      }
+    };
+
+    gwi.querySelectorAll(".gwi-input").forEach((inp) => inp.addEventListener("input", recalc));
+    gwi.querySelector("#resetWhatIf")?.addEventListener("click", () => {
+      state.ui.whatIf = state.ui.whatIf || {};
+      delete state.ui.whatIf[course.id];
+      gwi.querySelectorAll(".gwi-input").forEach((inp) => {
+        inp.value = inp.dataset.actual || "";
+      });
+      recalc();
+    });
+  }
 }
 
 function openAddAssignmentModal(courseId, state, isTest) {
