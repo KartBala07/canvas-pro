@@ -202,6 +202,41 @@ html[data-theme="cream-dark"] {
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ---------- Themed scrollbars (rounded, tinted — no ugly white bars) ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 35%, var(--border)) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-corner { background: transparent; }
+.modal, .modal-wide { scrollbar-gutter: stable; }
+
+/* Chat: agent tool notes + SVG chart bubbles */
+.msg.bot.tool-note {
+  background: color-mix(in srgb, var(--green) 12%, var(--bg-card));
+  border: 1px dashed color-mix(in srgb, var(--green) 45%, transparent);
+  font-size: 12.5px;
+}
+.msg.bot.chart-msg img {
+  display: block;
+  max-width: 100%;
+  border-radius: 12px;
+  margin-top: 6px;
+}
+.chart-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+
 html, body { height: 100%; }
 
 body {
@@ -339,6 +374,12 @@ h2 { font-size: 17px; margin-bottom: 12px; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Equal-height cards + meta rows for a consistent look */
+.grid > .card, .grid > .course-card { display: flex; flex-direction: column; }
+.grid .card .stat-row, .grid .course-card .stat-row { margin-top: auto; }
+.card .top + .stat-row { margin-top: 10px; }
+.course-card { min-height: 132px; }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

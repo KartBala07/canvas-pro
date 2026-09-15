@@ -183,13 +183,27 @@ function bindEvents() {
     }
   });
 
-  // Handle course detail navigation via custom event
+  // Handle course detail navigation via custom event (dashboard course cards
+  // navigate in, the detail view's back button navigates out).
   window.addEventListener("tab-change", (e) => {
     const { tab, courseId } = e.detail || {};
     if (tab === "courseDetail" && courseId) {
       state.ui = state.ui || {};
       state.ui.courseDetailId = courseId;
       renderTab("courseDetail");
+      return;
+    }
+    if (tab === "dashboard") {
+      const ui = state.ui || {};
+      delete ui.courseDetailId;
+      delete ui.courseDetailTab;
+      state.tab = "dashboard";
+      const dash = document.querySelector('.sidebar .tab-btn[data-tab="dashboard"]');
+      if (dash) {
+        $$(".sidebar .tab-btn").forEach((b) => b.classList.remove("active"));
+        dash.classList.add("active");
+      }
+      renderTab("dashboard");
     }
   });
 }

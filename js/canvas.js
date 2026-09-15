@@ -102,6 +102,18 @@ export function getAssignmentGroups(courseId) {
   return all(`/api/v1/courses/${courseId}/assignment_groups?include[]=assignments&assignment[]=submission&override_assignment_dates=false`);
 }
 
+// All of the current user's submissions for a course — the canonical source of
+// "did I get a grade" that works even when the group include is scope-limited.
+// grouped=1 returns { assignments: [], submissions: [{ assignment_id, score, workflow_state }] }.
+export function getStudentSubmissions(courseId) {
+  return api(`/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&grouped=1`);
+}
+
+// Generic write helper for the canvas proxy (submit work, upload preflight…).
+export function post(path, body) {
+  return api(path, { method: "POST", body });
+}
+
 export function getTodos() {
   return api("/api/v1/users/self/todo?include[]=course");
 }

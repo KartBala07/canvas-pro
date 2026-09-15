@@ -152,5 +152,26 @@ export async function loadAll(onStage) {
     dedupeTodos.push(task);
   }
 
+  // Merge authoritative submission scores so graded work always shows its grade,
+  // even if the assignment-groups include was scope-limited or empty.
+  await mapWithConcurrency(courses, async (c) => {
+    try {
+      const res = await canvas.getStudentSubmissions(c.id);
+      const byAid = new Map((res?.submissions || []).map((s) => [s.assignment_id, s]));
+      for (const t of tasks) {
+        if (t.courseId !== c.id || !t.canvasId) continue;
+        const sub = byAid.get(t.canvasId);
+        if (!sub) continue;
+        if (sub.score != null) t.pointsEarned = sub.score;
+        if (sub.workflow_state) {
+          t.submitted = sub.workflow_state === "submitted" || sub.workflow_state === "graded" || !!sub.graded_at;
+          t.needsGrading = sub.workflow_state === "pending_review" || (sub.workflow_state === "submitted" && sub.score == null);
+        }
+      }
+    } catch (e) {
+      console.warn(`Submission fetch failed for ${c.name}`, e);
+    }
+  });
+
   return { courses, tasks, todos: dedupeTodos, profile };
 }

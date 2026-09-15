@@ -1,5 +1,5 @@
 import { esc, toast } from "../utils.js";
-import { settings, doneIds } from "../storage.js";
+import { settings, doneIds, setDone } from "../storage.js";
 
 function snapshot(state) {
   const courses = state.data?.courses || [];
@@ -78,15 +78,75 @@ export function render(state, root, isStale = () => false) {
     return div;
   }
 
+  // Apply actions the local agent asks for: mark done, or show an SVG chart.
+  function applyActions(actions) {
+    for (const a of actions || []) {
+      if (!a || typeof a !== "object") continue;
+      if (a.type === "setDone" && a.id) {
+        setDone(a.id, !!a.done);
+        if (!isStale()) {
+          const div = document.createElement("div");
+          div.className = "msg bot tool-note";
+          div.textContent = `☑ ${a.title || "Assignment"} marked ${a.done ? "done" : "open"} in the app.`;
+          wrap.appendChild(div);
+          wrap.scrollTop = wrap.scrollHeight;
+        }
+      } else if (a.type === "chart" && a.svg) {
+        const div = document.createElement("div");
+        div.className = "msg bot chart-msg";
+        const label = a.title ? `<div class="chart-title">${esc(a.title)}</div>` : "";
+        div.innerHTML = `${label}<img src="data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(a.svg)))}" alt="${esc(a.title || "chart")}" />`;
+        wrap.appendChild(div);
+        wrap.scrollTop = wrap.scrollHeight;
+      }
+    }
+  }
+
+  function renderBubbles(out) {
+    if (isStale()) return;
+    applyActions(out.actions);
+    addMsg("bot", out.text || "(no text from agent)");
+  }
+
   async function send() {
     const text = inp.value.trim();
     if (!text) return;
     inp.value = "";
     addMsg("user", text);
-    const prov = s.aiProvider || "openai";
+    const s2 = settings();
+    const prov = (s2.aiProvider || "openai");
     try {
-      if (prov !== "opencode" && !s.aiKey) throw new Error("No AI key configured — add one in Settings → AI.");
-      const body = { model: s.aiModel || undefined };
+      if (prov === "local") {
+        // Local Ollama agent behind the server: message + done checklist in,
+        // text + client actions out.
+        const headers = {
+          "Content-Type": "application/json",
+          "X-AI-Token": s2.token || "",
+          "X-AI-Base": s2.canvasBaseUrl || "",
+          "X-AI-Ollama": s2.aiUrl || "http://localhost:11434",
+          "X-AI-Model": s2.aiModel || "gemma4:e2b",
+          "X-AI-Session": state.ai.ocSession || "",
+        };
+        const resp = await fetch("/api/agent", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ message: text, doneIds: doneIds() }),
+        });
+        const sid = resp.headers.get("X-AI-Session");
+        if (sid) state.ai.ocSession = sid;
+        const rawText = await resp.text();
+        let data = {};
+        try { data = JSON.parse(rawText); } catch (e) {}
+        if (!resp.ok) {
+          let why = data.message || "";
+          if (!why) why = "Can't reach the local agent. Is Ollama running, and has the server been restarted?";
+          throw new Error(why);
+        }
+        renderBubbles(data);
+        return;
+      }
+      if (prov !== "opencode" && !s2.aiKey) throw new Error("No AI key configured — add one in Settings → AI.");
+      const body = { model: s2.aiModel || undefined };
       if (prov === "opencode") {
         const withCtx = state.ai.ctxOn ? `[My Canvas context]\n${snapshot(state)}\n\n---\n${text}` : text;
         body.messages = [{ role: "user", content: withCtx }];
@@ -98,9 +158,9 @@ export function render(state, root, isStale = () => false) {
       const headers = {
         "Content-Type": "application/json",
         "X-AI-Provider": prov,
-        "X-AI-Url": s.aiUrl || (prov === "opencode" ? "http://localhost:4096" : "https://api.openai.com/v1/chat/completions"),
+        "X-AI-Url": s2.aiUrl || (prov === "opencode" ? "http://localhost:4096" : "https://api.openai.com/v1/chat/completions"),
       };
-      if (s.aiKey) headers["X-AI-Key"] = s.aiKey;
+      if (s2.aiKey) headers["X-AI-Key"] = s2.aiKey;
       if (prov === "opencode") headers["X-AI-Session"] = state.ai.ocSession || "";
       const resp = await fetch("/api/ai", {
         method: "POST",

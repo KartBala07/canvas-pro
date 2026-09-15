@@ -290,11 +290,14 @@ function updateSubmitButton(wrap, type) {
 }
 
 async function submitAssignment(task, state, type, wrap) {
-  const s = settings();
-  const base = s.canvasBaseUrl || "";
   const cid = task.courseId;
 
   try {
+    if (!task.canvasId) {
+      toast("This is a local task — submit online, or open the Canvas version to submit here.", "err");
+      return false;
+    }
+
     if (type === "online_text_entry") {
       const text = wrap.querySelector('textarea[name="text_entry"]').value;
       await submitToCanvas({ submission_type: "online_text_entry", body: text });
@@ -304,21 +307,23 @@ async function submitAssignment(task, state, type, wrap) {
     } else if (type === "online_upload") {
       const files = wrap.querySelector('input[name="files"]').files;
       if (!files.length) return false;
-      // Upload each file first
       const fileIds = [];
       for (const file of files) {
-        const id = await uploadFile(base, cid, s.token, file);
+        const id = await uploadFile(cid, file);
         if (id) fileIds.push(id);
       }
+      if (!fileIds.length) throw new Error("No files uploaded.");
       await submitToCanvas({ submission_type: "online_upload", file_ids: fileIds });
     } else if (type === "media_recording") {
+      // Recorded media is submitted as a regular file upload (Canvas's native
+      // media submission needs a Kaltura session, so files cover the practical case).
       const preview = wrap.querySelector('#mediaPreview');
       const mediaFile = preview.dataset.mediaFile;
       if (!mediaFile) return false;
-      const id = await uploadFile(base, cid, s.token, mediaFile);
-      await submitToCanvas({ submission_type: "media_recording", media_file_id: id });
+      const id = await uploadFile(cid, mediaFile);
+      if (!id) throw new Error("Media upload failed.");
+      await submitToCanvas({ submission_type: "online_upload", file_ids: [id] });
     } else if (type === "student_annotation") {
-      // Would need teacher-provided document ID
       toast("Student annotation requires a teacher-provided document.", "err");
       return false;
     }
@@ -332,37 +337,36 @@ async function submitAssignment(task, state, type, wrap) {
     return false;
   }
 
+  // Both writes go through the local /api/canvas proxy — the browser never
+  // talks to Canvas directly, so there is no CORS block and the token stays on
+  // this machine.
   async function submitToCanvas(data) {
-    const res = await fetch(`${base}/api/v1/courses/${cid}/assignments/${task.canvasId}/submissions`, {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + s.token, "Content-Type": "application/json" },
-      body: JSON.stringify({ submission: data }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.errors?.[0]?.message || `HTTP ${res.status}`);
-    }
-    return res.json();
+    return canvas.post(`/api/v1/courses/${cid}/assignments/${task.canvasId}/submissions`, { submission: data });
   }
 
-  async function uploadFile(base, courseId, token, file) {
-    // First, get upload URL
-    const res = await fetch(`${base}/api/v1/courses/${courseId}/files`, {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, content_type: file.type, on_duplicate: "rename" }),
+  async function uploadFile(courseId, file) {
+    // 1) Preflight: get the signed upload_url + params via the proxy.
+    const pre = await canvas.post(`/api/v1/courses/${courseId}/files`, {
+      name: file.name,
+      size: file.size,
+      content_type: file.type || "application/octet-stream",
+      on_duplicate: "rename",
+      parent_folder_path: "/",
     });
-    if (!res.ok) throw new Error("Failed to get upload URL");
-    const uploadData = await res.json();
-
-    // Upload to S3/Canvas
+    const uploadUrl = pre.upload_url;
+    if (!uploadUrl) throw new Error("No upload URL returned.");
+    // 2) POST the multipart body (params + file) — the local server relays it
+    //    to Canvas so cross-origin rules don't apply.
     const formData = new FormData();
-    Object.entries(uploadData.upload_params).forEach(([k, v]) => formData.append(k, v));
+    Object.entries(pre.upload_params || {}).forEach(([k, v]) => formData.append(k, v));
     formData.append("file", file);
-
-    const uploadRes = await fetch(uploadData.upload_url, { method: "POST", body: formData });
-    if (!uploadRes.ok) throw new Error("File upload failed");
-    return uploadData.id;
+    const up = await fetch("/api/ul?u=" + encodeURIComponent(uploadUrl), { method: "POST", body: formData });
+    if (!up.ok) {
+      const err = (await up.text().catch(() => "")) || `HTTP ${up.status}`;
+      throw new Error("File upload failed: " + err.slice(0, 140));
+    }
+    const upJson = await up.json().catch(() => ({}));
+    return upJson.id || pre.id;
   }
 }
 
