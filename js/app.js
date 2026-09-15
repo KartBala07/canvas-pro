@@ -24,6 +24,7 @@ import { render as renderDocuments } from "./ui/documents.js";
 import { render as renderAnnouncements } from "./ui/announcements.js";
 import { render as renderLate } from "./ui/latelist.js";
 import { render as renderAi } from "./ui/ai.js";
+import { render as renderCourseDetail } from "./ui/courseDetail.js";
 
 const VIEWS = {
   dashboard: renderDashboard,
@@ -38,6 +39,7 @@ const VIEWS = {
   announcements: renderAnnouncements,
   latelist: renderLate,
   ai: renderAi,
+  courseDetail: renderCourseDetail,
 };
 
 const state = { data: cacheData(), profile: null };
@@ -176,6 +178,16 @@ function bindEvents() {
     }
     if (e.target.closest && e.target.closest("#userBtn")) {
       switchTab(document.querySelector('.tab-btn[data-tab="settings"]'));
+    }
+  });
+
+  // Handle course detail navigation via custom event
+  window.addEventListener("tab-change", (e) => {
+    const { tab, courseId } = e.detail || {};
+    if (tab === "courseDetail" && courseId) {
+      state.ui = state.ui || {};
+      state.ui.courseDetailId = courseId;
+      renderTab("courseDetail");
     }
   });
 }

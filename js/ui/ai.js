@@ -22,9 +22,8 @@ function snapshot(state) {
 
 export function render(state, root, isStale = () => false) {
   const s = settings();
-  const messages = [];
-  let ocSession = null;
-  let ctxOn = true;
+  if (!state.ai) state.ai = { messages: [], ocSession: null, ctxOn: true };
+  const { messages, ocSession, ctxOn } = state.ai;
 
   root.innerHTML = `
     <h1>AI Assistant</h1>
@@ -50,10 +49,19 @@ export function render(state, root, isStale = () => false) {
   const inp = root.querySelector("#aiIn");
   const btn = root.querySelector("#aiSend");
   const ctx = root.querySelector("#aiCtx");
-  ctx.addEventListener("change", () => ctxOn = ctx.checked);
+  ctx.addEventListener("change", () => { state.ai.ctxOn = ctx.checked; });
   root.querySelector("#aiClear").addEventListener("click", () => {
-    ocSession = null; messages.length = 0; wrap.innerHTML = "";
+    state.ai.ocSession = null; state.ai.messages.length = 0; wrap.innerHTML = "";
   });
+
+  // Restore chat history from persisted state
+  for (const m of state.ai.messages) {
+    const div = document.createElement("div");
+    div.className = "msg " + (m.role === "assistant" ? "bot" : "user");
+    div.textContent = m.content;
+    wrap.appendChild(div);
+  }
+  wrap.scrollTop = wrap.scrollHeight;
 
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -66,7 +74,7 @@ export function render(state, root, isStale = () => false) {
     div.textContent = text;
     wrap.appendChild(div);
     wrap.scrollTop = wrap.scrollHeight;
-    messages.push({ role: role === "bot" ? "assistant" : "user", content: text });
+    state.ai.messages.push({ role: role === "bot" ? "assistant" : "user", content: text });
     return div;
   }
 
@@ -80,13 +88,11 @@ export function render(state, root, isStale = () => false) {
       if (prov !== "opencode" && !s.aiKey) throw new Error("No AI key configured — add one in Settings → AI.");
       const body = { model: s.aiModel || undefined };
       if (prov === "opencode") {
-        // opencode keeps conversation in its own session; we send one fresh
-        // user message (with Canvas context prefixed) and reuse the session.
-        const withCtx = ctxOn ? `[My Canvas context]\n${snapshot(state)}\n\n---\n${text}` : text;
+        const withCtx = state.ai.ctxOn ? `[My Canvas context]\n${snapshot(state)}\n\n---\n${text}` : text;
         body.messages = [{ role: "user", content: withCtx }];
       } else {
-        const messagesWithCtx = messages.map((m) => ({ ...m }));
-        if (ctxOn) messagesWithCtx.splice(0, 0, { role: "system", content: snapshot(state) });
+        const messagesWithCtx = state.ai.messages.map((m) => ({ ...m }));
+        if (state.ai.ctxOn) messagesWithCtx.splice(0, 0, { role: "system", content: snapshot(state) });
         body.messages = messagesWithCtx;
       }
       const headers = {
@@ -95,14 +101,14 @@ export function render(state, root, isStale = () => false) {
         "X-AI-Url": s.aiUrl || (prov === "opencode" ? "http://localhost:4096" : "https://api.openai.com/v1/chat/completions"),
       };
       if (s.aiKey) headers["X-AI-Key"] = s.aiKey;
-      if (prov === "opencode") headers["X-AI-Session"] = ocSession || "";
+      if (prov === "opencode") headers["X-AI-Session"] = state.ai.ocSession || "";
       const resp = await fetch("/api/ai", {
         method: "POST",
         headers,
         body: JSON.stringify(body),
       });
       const sid = resp.headers.get("X-AI-Session");
-      if (sid) ocSession = sid;
+      if (sid) state.ai.ocSession = sid;
       const rawText = await resp.text();
       let data = {};
       try { data = JSON.parse(rawText); } catch (e) {}
