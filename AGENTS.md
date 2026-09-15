@@ -57,7 +57,9 @@ inbox + log between the user and the agent. Read `README.md` there first.
 
 - `Ideas/Integrations.md` + `Ideas/Bugs.md` — the user drops in requested work
   as `- [ ]` bullets. When the user says "check the vault", read these, work
-  through the requested (unchecked) items, and tick them `- [x]` when done.
+  through the requested (unchecked) items. On completion **cut the item out of
+  the Ideas file** (do not leave it ticked) and move the full documentation to
+  the matching Logs file. Ideas files hold only open items.
 - `Logs/Integrations.md` + `Logs/Bugs.md` — after finishing each task, append a
   dated `## YYYY-MM-DD — <title>` entry documenting what was done (files
   touched, commit/rev, any caveats like "needs server restart").
